@@ -21,16 +21,20 @@ path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # path from this script to project root
 path_to_project_root='../..'
 
+# name of the project
+# TODO: align this with project(dd-release) in CMakeLists.txt ?
+project_name='dd-release'
+
 # path to temporary working folder, relative to project root
 working_folder='../tmp/deploy'
 
 # path from working folder back to project root
-path_from_working_folder_to_project_root='../../dd-release'
+path_from_working_folder_to_project_root="../../${project_name}"
 
 
 # -----------------------------------------------------------------------------
 # change to project root directory
-pushd "${path_to_this_script}/${path_to_project_root}/${working_folder}" > /dev/null
+pushd "${path_to_this_script}/${path_to_project_root}" > /dev/null
 
 
 # remove and (re-) create temporary working folder
@@ -40,12 +44,18 @@ then
 fi
 mkdir -p "${working_folder}"
 
+# change to working folder
+pushd "${working_folder}" > /dev/null
+
 # delete files OS X keeps creating so they are not added to the package
 find . \( -iname '._*' -or -iname '.DS_Store' \) -delete
 
 # build the package
 cmake "${path_from_working_folder_to_project_root}/build"
-make package
+make "${project_name}-package"
+
+# change back to previous location
+popd > /dev/null
 
 
 # change back to previous location
