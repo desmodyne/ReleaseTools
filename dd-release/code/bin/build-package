@@ -19,11 +19,14 @@
 path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # path from this script to project root
-path_to_project_root='../..'
+rel_path_to_project_root='../..'
 
-# name of the project
-# TODO: align this with project(dd-release) in CMakeLists.txt ?
-project_name='dd-release'
+# absolute path to project root
+# if needed on OS X, use grealpath: http://apple.stackexchange.com/a/88812
+abs_path_to_project_root="$(realpath "${path_to_this_script}/${rel_path_to_project_root}")"
+
+# get project name from project root folder
+project_name="$(basename "${abs_path_to_project_root}")"
 
 # path to temporary working folder, relative to project root
 working_folder='../tmp/deploy'
@@ -34,7 +37,7 @@ path_from_working_folder_to_project_root="../../${project_name}"
 
 # -----------------------------------------------------------------------------
 # change to project root directory
-pushd "${path_to_this_script}/${path_to_project_root}" > /dev/null
+pushd "${abs_path_to_project_root}" > /dev/null
 
 
 # remove and (re-) create temporary working folder
