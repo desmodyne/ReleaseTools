@@ -1,0 +1,12 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: DesmoDyne ReleaseTools
+Upstream-Contact: DesmoDyne <contact@desmodyne.com>
+Disclaimer: This is proprietary, non-free software and not part of Debian.
+License: Proprietary
+Copyright: 2016 DesmoDyne
+
+Files: *
+Copyright: Copyright 2016 DesmoDyne <contact@desmodyne.com>
+License: Proprietary
+ This product is protected by copyright and distributed under licenses
+ restricting copying, distribution and decompilation.

@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+# build-package
+#
+# build Debian package
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-06-01
+
+
+# TODO: make sure this is only run on a Debian system
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+path_to_project_root='../..'
+
+# path to temporary working folder, relative to project root
+working_folder='../tmp/deploy'
+
+# path from working folder back to project root
+path_from_working_folder_to_project_root='../../dd-release'
+
+
+# -----------------------------------------------------------------------------
+# change to project root directory
+pushd "${path_to_this_script}/${path_to_project_root}/${working_folder}" > /dev/null
+
+
+# remove and (re-) create temporary working folder
+if [ -d "${working_folder}" ]
+then
+    rm -r "${working_folder}"
+fi
+mkdir -p "${working_folder}"
+
+# delete files OS X keeps creating so they are not added to the package
+find . \( -iname '._*' -or -iname '.DS_Store' \) -delete
+
+# build the package
+cmake "${path_from_working_folder_to_project_root}/build"
+make package
+
+
+# change back to previous location
+popd > /dev/null
