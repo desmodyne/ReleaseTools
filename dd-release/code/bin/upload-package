@@ -91,4 +91,4 @@ echo "${message}"
 echo "${remote_folder}:"
 echo
 
-rsync --archive --checksum --dryrun --verbose "${local_folder}/" "${remote_folder}"
+rsync --archive --checksum --verbose "${local_folder}/" "${remote_folder}"
