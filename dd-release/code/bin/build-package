@@ -22,7 +22,8 @@ path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 rel_path_to_project_root='../..'
 
 # absolute path to project root
-# if needed on OS X, use grealpath: http://apple.stackexchange.com/a/88812
+# on Debian, install realpath using e.g. aptitude install realpath
+# on OS X, use grealpath: http://apple.stackexchange.com/a/88812
 abs_path_to_project_root="$(realpath "${path_to_this_script}/${rel_path_to_project_root}")"
 
 # get project name from project root folder
