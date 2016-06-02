@@ -29,7 +29,7 @@ set(CPACK_INSTALL_CMAKE_PROJECTS        "${CMAKE_CURRENT_BINARY_DIR};${PROJECT_N
 set(CPACK_OUTPUT_CONFIG_FILE            "${CMAKE_CURRENT_BINARY_DIR}/CPack${PROJECT_NAME}Config.cmake")
 set(CPACK_OUTPUT_FILE_PREFIX            "${CMAKE_BINARY_DIR}/packages")
 
-set(CPACK_DEBIAN_PACKAGE_DEPENDS        "bash, git, git-flow")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS        "bash, git-flow, realpath")
 set(CPACK_DEBIAN_PACKAGE_SECTION        "non-free/devel")
 
 install(DIRECTORY ${PROJECT_ROOT}/data/mirror/ DESTINATION / USE_SOURCE_PERMISSIONS)
