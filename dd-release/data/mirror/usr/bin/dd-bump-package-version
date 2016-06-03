@@ -14,6 +14,29 @@
 
 
 # -----------------------------------------------------------------------------
+# determine platform: http://stackoverflow.com/a/18434831
+
+# NOTE: on OS X, install GNU sed and grep using
+# brew tap homebrew/dupes; brew install gnu-sed grep
+# http://apple.stackexchange.com/a/69332
+
+case "${OSTYPE}" in
+  darwin*)
+    grep='ggrep'
+    sed='gsed'
+    ;;
+  linux*)
+    grep='grep'
+    sed='sed'
+    ;;
+  *)
+    echo "Unknown OS: ${OSTYPE}"
+    exit -1
+    ;;
+esac
+
+
+# -----------------------------------------------------------------------------
 # process command line arguments
 
 if [ $# -ne 1 ]
@@ -36,42 +59,35 @@ fi
 # -----------------------------------------------------------------------------
 # configure script parameters
 
-# absolute path to this script: http://stackoverflow.com/a/9107028
-path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# path from this script to project root
-path_to_project_root='../../../..'
-
-# path to project configuration file, relative to project root
-path_to_proj_conf='build/CMakeLists.txt'
+# path to project configuration file, relative to root of target project
+path_to_proj_conf="$1/build/CMakeLists.txt"
 
 # regular expression pattern for line defining patch version
 patch_regex='(set\(CPACK_PACKAGE_VERSION_PATCH\s+")([0-9]+)("\))'
 
 
 # -----------------------------------------------------------------------------
-# change to project root directory
+# verify project conf exists before accessing it
 
-# NOTE: pushd / popd require bash
-pushd "${path_to_this_script}/${path_to_project_root}" > /dev/null
+if [ ! -f "${path_to_proj_conf}" ]
+then
+  echo "Failed to find project configuration file: ${path_to_proj_conf}"
+  exit -1
+fi
 
 # bump patch version
 
+# TODO: verify this works with relative paths passed as cmd line argument
 # TODO: prevent processing conf of this project during development ?
 # TODO: verify required executables are available before using them ?
-# TODO: verify project conf exists before accessing it
-# TODO: handle OSX ggrep / gsed <---> Linux grep / sed
 # TODO: script return value when run as Jenkins job ?!?
 
 # get line with current patch version
-patch_line=$(ggrep -E "${patch_regex}" "${path_to_proj_conf}")
+patch_line=$("${grep}" -E "${patch_regex}" "${path_to_proj_conf}")
 
 # get current patch version number and increment it
-patch_version="$(echo "${patch_line}" | gsed -r -e "s|${patch_regex}|\2|g")"
+patch_version="$(echo "${patch_line}" | "${sed}" -r -e "s|${patch_regex}|\2|g")"
 patch_version=$((patch_version+1))
 
 # replace current with new patch version
-gsed -i -r -e "s|${patch_regex}|\1${patch_version}\3|g" "${path_to_proj_conf}"
-
-# change back to previous location
-popd > /dev/null
+"${sed}" -i -r -e "s|${patch_regex}|\1${patch_version}\3|g" "${path_to_proj_conf}"
