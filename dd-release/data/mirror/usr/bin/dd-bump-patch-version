@@ -21,18 +21,18 @@
 # http://apple.stackexchange.com/a/69332
 
 case "${OSTYPE}" in
-  darwin*)
-    grep='ggrep'
-    sed='gsed'
-    ;;
-  linux*)
-    grep='grep'
-    sed='sed'
-    ;;
-  *)
-    echo "Unknown OS: ${OSTYPE}"
-    exit -1
-    ;;
+    darwin*)
+        grep='ggrep'
+        sed='gsed'
+        ;;
+    linux*)
+        grep='grep'
+        sed='sed'
+        ;;
+    *)
+        echo "Unknown OS: ${OSTYPE}"
+        exit -1
+        ;;
 esac
 
 
@@ -46,13 +46,13 @@ then
 else
     if [ ! -e "$1" ]
     then
-      echo "$1: No such file or directory"
-      exit -1
+        echo "$1: No such file or directory"
+        exit -1
     fi
     if [ ! -d "$1" ]
     then
-      echo "$1: Not a directory"
-      exit -1
+        echo "$1: Not a directory"
+        exit -1
     fi
 fi
 
@@ -71,8 +71,8 @@ patch_regex='(set\(CPACK_PACKAGE_VERSION_PATCH\s+")([0-9]+)("\))'
 
 if [ ! -f "${path_to_proj_conf}" ]
 then
-  echo "Failed to find project configuration file: ${path_to_proj_conf}"
-  exit -1
+    echo "Failed to find project configuration file: ${path_to_proj_conf}"
+    exit -1
 fi
 
 # bump patch version
