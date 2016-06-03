@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+
+# dd-bump-patch-version
+#
+# increase version number patch level by 1
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-06-03
+
+
+# MAJOR.MINOR.PATCH versioning: http://semver.org
+# https://en.wikipedia.org/wiki/Software_versioning
+
+
+# -----------------------------------------------------------------------------
+# determine platform: http://stackoverflow.com/a/18434831
+
+# NOTE: on OS X, install GNU sed and grep using
+# brew tap homebrew/dupes; brew install gnu-sed grep
+# http://apple.stackexchange.com/a/69332
+
+case "${OSTYPE}" in
+  darwin*)
+    grep='ggrep'
+    sed='gsed'
+    ;;
+  linux*)
+    grep='grep'
+    sed='sed'
+    ;;
+  *)
+    echo "Unknown OS: ${OSTYPE}"
+    exit -1
+    ;;
+esac
+
+
+# -----------------------------------------------------------------------------
+# process command line arguments
+
+if [ $# -ne 1 ]
+then
+    echo "Usage: $(basename "$0") <project folder>"
+    exit -1
+else
+    if [ ! -e "$1" ]
+    then
+      echo "$1: No such file or directory"
+      exit -1
+    fi
+    if [ ! -d "$1" ]
+    then
+      echo "$1: Not a directory"
+      exit -1
+    fi
+fi
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# path to project configuration file, relative to root of target project
+path_to_proj_conf="$1/build/CMakeLists.txt"
+
+# regular expression pattern for line defining patch version
+patch_regex='(set\(CPACK_PACKAGE_VERSION_PATCH\s+")([0-9]+)("\))'
+
+
+# -----------------------------------------------------------------------------
+# verify project conf exists before accessing it
+
+if [ ! -f "${path_to_proj_conf}" ]
+then
+  echo "Failed to find project configuration file: ${path_to_proj_conf}"
+  exit -1
+fi
+
+# bump patch version
+
+# TODO: verify this works with relative paths passed as cmd line argument
+# TODO: prevent processing conf of this project during development ?
+# TODO: verify required executables are available before using them ?
+# TODO: script return value when run as Jenkins job ?!?
+
+# get line with current patch version
+patch_line=$("${grep}" -E "${patch_regex}" "${path_to_proj_conf}")
+
+# get current patch version number and increment it
+patch_version="$(echo "${patch_line}" | "${sed}" -r -e "s|${patch_regex}|\2|g")"
+patch_version=$((patch_version+1))
+
+# replace current with new patch version
+"${sed}" -i -r -e "s|${patch_regex}|\1${patch_version}\3|g" "${path_to_proj_conf}"
