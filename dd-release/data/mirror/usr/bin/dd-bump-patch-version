@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# dd-bump-package-version
+# dd-bump-patch-version
 #
 # increase version number patch level by 1
 #
