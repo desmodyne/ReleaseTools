@@ -31,6 +31,9 @@ fi
 
 # TODO: prevent processing repo this file is in during development ?
 # TODO: verify required executables are available before using them ?
+# TODO: script return value when run as Jenkins job ?!?
+# TODO: run git flow init if required ?
+# TODO: verify release branch to create does not exist on remote yet ?
 
 
 # -----------------------------------------------------------------------------
@@ -52,5 +55,3 @@ pushd "${repo_root}" > /dev/null
 echo "Creating release ${release_name} in ${repo_root}:"
 git flow release start "${release_name}"
 popd > /dev/null
-
-# TODO: error handling / return value <---> Jenkins job ?!?

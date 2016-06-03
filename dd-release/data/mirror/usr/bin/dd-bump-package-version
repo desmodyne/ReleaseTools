@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+
+# dd-bump-package-version
+#
+# increase version number patch level by 1
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-06-03
+
+
+# MAJOR.MINOR.PATCH versioning: http://semver.org
+# https://en.wikipedia.org/wiki/Software_versioning
+
+
+# -----------------------------------------------------------------------------
+# process command line arguments
+
+if [ $# -ne 1 ]
+then
+    echo "Usage: $(basename "$0") <project folder>"
+    exit -1
+else
+    if [ ! -e "$1" ]
+    then
+      echo "$1: No such file or directory"
+      exit -1
+    fi
+    if [ ! -d "$1" ]
+    then
+      echo "$1: Not a directory"
+      exit -1
+    fi
+fi
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+path_to_project_root='../../../..'
+
+# path to project configuration file, relative to project root
+path_to_proj_conf='build/CMakeLists.txt'
+
+# regular expression pattern for line defining patch version
+patch_regex='(set\(CPACK_PACKAGE_VERSION_PATCH\s+")([0-9]+)("\))'
+
+
+# -----------------------------------------------------------------------------
+# change to project root directory
+
+# NOTE: pushd / popd require bash
+pushd "${path_to_this_script}/${path_to_project_root}" > /dev/null
+
+# bump patch version
+
+# TODO: prevent processing conf of this project during development ?
+# TODO: verify required executables are available before using them ?
+# TODO: verify project conf exists before accessing it
+# TODO: handle OSX ggrep / gsed <---> Linux grep / sed
+# TODO: script return value when run as Jenkins job ?!?
+
+# get line with current patch version
+patch_line=$(ggrep -E "${patch_regex}" "${path_to_proj_conf}")
+
+# get current patch version number and increment it
+patch_version="$(echo "${patch_line}" | gsed -r -e "s|${patch_regex}|\2|g")"
+patch_version=$((patch_version+1))
+
+# replace current with new patch version
+gsed -i -r -e "s|${patch_regex}|\1${patch_version}\3|g" "${path_to_proj_conf}"
+
+# change back to previous location
+popd > /dev/null
