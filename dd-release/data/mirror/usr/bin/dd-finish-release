@@ -74,8 +74,10 @@ release_name="$(date +"%Y").$(( $(date +"%V") - 1))"
 
 # message for creating release tag
 # TODO: add project and release names ?
-# TODO: on OSX, getopt fails on spaces:
+# TODO: on OSX, getopt fails on spaces, even
+# with extra / escaped single / double quotes:
 # https://github.com/nvie/gitflow/issues/98
+# TODO: does this also occur on on Linux ?
 tag_message='automatically_created_release_tag'
 
 
