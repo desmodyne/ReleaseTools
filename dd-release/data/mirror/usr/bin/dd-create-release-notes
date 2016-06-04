@@ -26,7 +26,7 @@ case "${OSTYPE}" in
         sed='sed'
         ;;
     *)
-        echo "Unknown OS: ${OSTYPE}"
+        echo "Unsupported operating system: ${OSTYPE}"
         exit -1
         ;;
 esac
@@ -62,17 +62,35 @@ fi
 # -----------------------------------------------------------------------------
 # configure script parameters
 
-# absolute path to the root folder of the repository to process
+# absolute path to root folder of repository to process
 repo_root="$(realpath "$1")"
 
 # release branch prefix; 'release' as per git flow convention
 rel_prefix='release'
+
+# path to folder where release notes will be stored,
+# relative to root folder of repository to process
+output_folder='doc/txt/Release Notes'
+
+# name of the generated release notes file;
+# release name will be amended further below
+output_filename="$(date +"%Y%m%d") Release Notes <release name>.txt"
+
+# message for committing release notes
+# TODO: add project and release names ?
+commit_message='[#1]: add release notes'
 
 
 # -----------------------------------------------------------------------------
 # change to target project root directory
 pushd "${repo_root}" > /dev/null
 
+
+# create output folder if required
+if [ ! -d "${output_folder}" ]
+then
+    mkdir -p "${output_folder}"
+fi
 
 # verify target project is on a release branch
 current_branch="$(git branch | "${grep}" '^* ' | "${sed}" -e 's|* ||g')"
@@ -112,11 +130,25 @@ fi
 prev_release="$(git rev-parse --verify master)"
 this_release="$(git rev-parse --verify HEAD)"
 
+# https://github.com/koalaman/shellcheck/wiki/SC2001
+current_branch="${current_branch//${rel_prefix}\//}"
+output_filename="${output_filename//<release name>/${current_branch}}"
+
 # TODO: --format=format:<string> ?
 # TODO: internal / external release notes ?
-
 # TODO: make order and format configurable ?
-git rev-list --topo-order --format=fuller "${prev_release}".."${this_release}"
+
+git rev-list --topo-order --format=fuller \
+   "${prev_release}".."${this_release}"   \
+ > "${output_folder}/${output_filename}"
+
+
+ # add and commit changes to git repository
+ # TODO: error handling ? get log output ?
+
+ git add "${output_folder}/${output_filename}"
+
+ git commit --message "${commit_message}"
 
 
 popd > /dev/null
