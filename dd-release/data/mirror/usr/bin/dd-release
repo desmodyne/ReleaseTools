@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+# dd-release
+#
+# perform a complete software release
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-06-04
+
+
+# -----------------------------------------------------------------------------
+# process command line arguments
+
+if [ $# -ne 1 ]
+then
+    echo "Usage: $(basename "$0") <repository root folder>"
+    exit -1
+else
+    if [ ! -e "$1" ]
+    then
+        echo "$1: No such file or directory"
+        exit -1
+    fi
+    if [ ! -d "$1" ]
+    then
+        echo "$1: Not a directory"
+        exit -1
+    fi
+fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to the root folder of the repository to process
+repo_root="$(realpath "$1")"
+
+
+# -----------------------------------------------------------------------------
+# call the other scripts in the designated order
+
+# TODO: review error handling (use trap with error function ?)
+# TODO: this assumes the script is called from the folder it is located in
+
+./dd-start-release        "${repo_root}"
+res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+./dd-bump-patch-version   "${repo_root}"
+res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+./dd-create-release-notes "${repo_root}"
+res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+./dd-finish-release       "${repo_root}"
+res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
