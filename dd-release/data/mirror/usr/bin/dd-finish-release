@@ -81,18 +81,19 @@ release_name="$(date +"%Y").$(( $(date +"%V") - 1))"
 tag_message='automatically_created_release_tag'
 
 
-# -----------------------------------------------------------------------------
-# finish the release
-
-
 # NOTE: pushd / popd require bash
 pushd "${repo_root}" > /dev/null
+
+
+# -----------------------------------------------------------------------------
+# finish the release
 
 echo "Finish release ${release_name} in ${repo_root}:"
 
 # http://stackoverflow.com/q/14531243
 # https://github.com/nvie/gitflow/pull/287
 # echo "GIT_MERGE_AUTOEDIT: ${GIT_MERGE_AUTOEDIT}"
+# TODO: store value before setting it; restore after use
 export GIT_MERGE_AUTOEDIT=no
 # echo "GIT_MERGE_AUTOEDIT: ${GIT_MERGE_AUTOEDIT}"
 
@@ -119,7 +120,9 @@ export GIT_MERGE_AUTOEDIT=no
 # flags:FATAL unable to parse provided options with getopt.
 
 git flow release finish -m "${tag_message}" "${release_name}"
+res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 
 export GIT_MERGE_AUTOEDIT=
+
 
 popd > /dev/null

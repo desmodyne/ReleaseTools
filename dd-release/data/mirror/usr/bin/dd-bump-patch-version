@@ -73,10 +73,14 @@ patch_regex='(set\(CPACK_PACKAGE_VERSION_PATCH\s+")([0-9]+)("\))'
 commit_message='[#1]: bump patch version'
 
 
-# -----------------------------------------------------------------------------
-# change to target project root directory
+# NOTE: pushd / popd require bash
 pushd "${repo_root}" > /dev/null
 
+
+# -----------------------------------------------------------------------------
+# bump patch version
+
+echo "Bump patch version in ${repo_root}:"
 
 # verify project configuration exists before accessing it
 if [ ! -f "${path_to_proj_conf}" ]
@@ -86,8 +90,6 @@ then
     exit -1
 fi
 
-# bump patch version
-
 # TODO: verify this works with relative paths passed as cmd line argument
 # TODO: prevent processing conf of this project during development ?
 # TODO: verify required executables are available before using them ?
@@ -96,20 +98,46 @@ fi
 # get line with current patch version
 patch_line=$("${grep}" -E "${patch_regex}" "${path_to_proj_conf}")
 
+if [ -z "${patch_line}" ]
+then
+    echo "Failed to find line with package version patch"
+    popd > /dev/null
+    exit -1
+fi
+
 # get current patch version number and increment it
 patch_version="$(echo "${patch_line}" | "${sed}" -r -e "s|${patch_regex}|\2|g")"
+
+if [ -z "${patch_version}" ]
+then
+    echo "Failed to get package version patch number from line ${patch_line}"
+    popd > /dev/null
+    exit -1
+fi
+
 patch_version=$((patch_version+1))
 
 # replace current with new patch version
 "${sed}" -i -r -e "s|${patch_regex}|\1${patch_version}\3|g" "${path_to_proj_conf}"
 
+res="$?"
+
+if [ "${res}" -ne 0 ]
+then
+    echo "Failed to replace current with new patch version in line ${patch_line}"
+    popd > /dev/null
+    exit "${res}"
+fi
+
 
 # add and commit changes to git repository
 # TODO: error handling ? get log output ?
 
+# git prints its own error messages
 git add "${path_to_proj_conf}"
-
+res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 git commit --message "${commit_message}"
+res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 
 
 popd > /dev/null
