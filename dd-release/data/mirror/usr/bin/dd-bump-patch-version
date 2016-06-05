@@ -145,43 +145,63 @@ pushd "${repo_root}" > /dev/null
 # -----------------------------------------------------------------------------
 # bump patch version
 
+error_flag=false
+
 if [ -d "${path_to_multi_proj_root}" ]
 then
-    echo "Multi-package project: ${repo_root}/${path_to_multi_proj_root}"
+    multi_proj_root="${repo_root}/${path_to_multi_proj_root}"
+
+    echo "Multi-package project: ${multi_proj_root}"
     echo
 
     # TODO: use find to limit list to folders ?
+    # find . -maxdepth 1 -mindepth 1 -type d | sed "s|^\./||"
     # TODO: https://github.com/koalaman/shellcheck/wiki/SC2045
-    for folder in $(ls "${repo_root}/${path_to_multi_proj_root}")
+    for folder in $(ls "${multi_proj_root}")
     do
-        project_conf="${repo_root}/${path_to_multi_proj_root}/${folder}/${path_to_proj_conf}"
+        project_conf="${multi_proj_root}/${folder}/${path_to_proj_conf}"
 
         echo "Bump patch version in ${project_conf}"
         bump_patch_version "${project_conf}"
 
         if [ "$?" -ne 0 ]
         then
-            echo "Failed to bump patch version in ${project_conf}"
+            error_flag=true
             continue
         fi
     done
+
+    echo
+
+    if [ "${error_flag}" = true ]
+    then
+        message="Not all package patch versions were bumped successfully; "
+        message+="please review log output above and fix before proceeding"
+        echo "${message}"
+        popd > /dev/null
+        exit -1
+    fi
 else
-    echo "Bump patch version in ${path_to_proj_conf}"
-    bump_patch_version "${path_to_proj_conf}"
+    project_conf="${repo_root}/${path_to_proj_conf}"
+
+    echo "Bump patch version in ${project_conf}"
+    bump_patch_version "${project_conf}"
 
     res="$?"
 
     if [ "${res}" -ne 0 ]
     then
-        echo "Failed to bump patch version in ${path_to_proj_conf}"
         popd > /dev/null
         exit "${res}"
     fi
 fi
 
-# TODO: disabled for development; re-activate
-# git commit --message "${commit_message}"
-# res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+
+if [ "${error_flag}" = false ]
+then
+    git commit --message "${commit_message}"
+    res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+fi
 
 
 popd > /dev/null
