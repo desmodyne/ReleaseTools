@@ -73,6 +73,69 @@ patch_regex='(set\(CPACK_PACKAGE_VERSION_PATCH\s+")([0-9]+)("\))'
 commit_message='[#1]: bump patch version'
 
 
+# -----------------------------------------------------------------------------
+# declare functions
+
+function bump_patch_version
+{
+    project_config="$1"
+
+    # verify project configuration exists before accessing it
+    if [ ! -f "${project_config}" ]
+    then
+        echo "Failed to find project configuration file: ${project_config}"
+        popd > /dev/null
+        return -1
+    fi
+
+    # TODO: verify this works with relative paths passed as cmd line argument
+    # TODO: prevent processing conf of this project during development ?
+    # TODO: verify required executables are available before using them ?
+    # TODO: script return value when run as Jenkins job ?!?
+
+    # get line with current patch version
+    patch_line=$("${grep}" -E "${patch_regex}" "${project_config}")
+
+    if [ -z "${patch_line}" ]
+    then
+        echo "Failed to find line with package version patch"
+        popd > /dev/null
+        return -1
+    fi
+
+    # get current patch version number and increment it
+    patch_version="$(echo "${patch_line}" | "${sed}" -r -e "s|${patch_regex}|\2|g")"
+
+    if [ -z "${patch_version}" ]
+    then
+        echo "Failed to get package version patch number from line ${patch_line}"
+        popd > /dev/null
+        return -1
+    fi
+
+    patch_version=$((patch_version+1))
+
+    # replace current with new patch version
+    "${sed}" -i -r -e "s|${patch_regex}|\1${patch_version}\3|g" "${project_config}"
+
+    res="$?"
+
+    if [ "${res}" -ne 0 ]
+    then
+        echo "Failed to replace current with new patch version in line ${patch_line}"
+        popd > /dev/null
+        return "${res}"
+    fi
+
+    # add changes to git repository
+    # TODO: error handling ? get log output ?
+
+    # git prints its own error messages
+    git add "${project_config}"
+    res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; return "${res}"; fi
+}
+
+
 # NOTE: pushd / popd require bash
 pushd "${repo_root}" > /dev/null
 
@@ -82,62 +145,20 @@ pushd "${repo_root}" > /dev/null
 
 echo "Bump patch version in ${repo_root}:"
 
-# verify project configuration exists before accessing it
-if [ ! -f "${path_to_proj_conf}" ]
-then
-    echo "Failed to find project configuration file: ${path_to_proj_conf}"
-    popd > /dev/null
-    exit -1
-fi
-
-# TODO: verify this works with relative paths passed as cmd line argument
-# TODO: prevent processing conf of this project during development ?
-# TODO: verify required executables are available before using them ?
-# TODO: script return value when run as Jenkins job ?!?
-
-# get line with current patch version
-patch_line=$("${grep}" -E "${patch_regex}" "${path_to_proj_conf}")
-
-if [ -z "${patch_line}" ]
-then
-    echo "Failed to find line with package version patch"
-    popd > /dev/null
-    exit -1
-fi
-
-# get current patch version number and increment it
-patch_version="$(echo "${patch_line}" | "${sed}" -r -e "s|${patch_regex}|\2|g")"
-
-if [ -z "${patch_version}" ]
-then
-    echo "Failed to get package version patch number from line ${patch_line}"
-    popd > /dev/null
-    exit -1
-fi
-
-patch_version=$((patch_version+1))
-
-# replace current with new patch version
-"${sed}" -i -r -e "s|${patch_regex}|\1${patch_version}\3|g" "${path_to_proj_conf}"
+bump_patch_version "${path_to_proj_conf}"
 
 res="$?"
 
 if [ "${res}" -ne 0 ]
 then
-    echo "Failed to replace current with new patch version in line ${patch_line}"
+    echo "Failed to bump patch version in ${path_to_proj_conf}"
     popd > /dev/null
     exit "${res}"
 fi
 
-
-# add and commit changes to git repository
-# TODO: error handling ? get log output ?
-
-# git prints its own error messages
-git add "${path_to_proj_conf}"
-res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
-git commit --message "${commit_message}"
-res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+# TODO: disabled for development; re-activate
+# git commit --message "${commit_message}"
+# res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 
 
 popd > /dev/null
