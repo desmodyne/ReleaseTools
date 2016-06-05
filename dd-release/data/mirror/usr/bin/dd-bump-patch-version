@@ -154,10 +154,8 @@ then
     echo "Multi-package project: ${multi_proj_root}"
     echo
 
-    # TODO: use find to limit list to folders ?
-    # find . -maxdepth 1 -mindepth 1 -type d | sed "s|^\./||"
-    # TODO: https://github.com/koalaman/shellcheck/wiki/SC2045
-    for folder in $(ls "${multi_proj_root}")
+    pushd "${multi_proj_root}" > /dev/null
+    for folder in $(find . -maxdepth 1 -mindepth 1 -type d | sed "s|^\./||")
     do
         project_conf="${multi_proj_root}/${folder}/${path_to_proj_conf}"
 
@@ -170,6 +168,7 @@ then
             continue
         fi
     done
+    popd > /dev/null
 
     echo
 
