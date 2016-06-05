@@ -62,6 +62,10 @@ fi
 # absolute path to root folder of repository to process
 repo_root="$(realpath "$1")"
 
+# path to multi-package project configuration
+# root folder, relative to root of target project
+path_to_multi_proj_root="packages"
+
 # path to project configuration file, relative to root of target project
 path_to_proj_conf="build/CMakeLists.txt"
 
@@ -84,8 +88,7 @@ function bump_patch_version
     if [ ! -f "${project_config}" ]
     then
         echo "Failed to find project configuration file: ${project_config}"
-        popd > /dev/null
-        return -1
+        return 1
     fi
 
     # TODO: verify this works with relative paths passed as cmd line argument
@@ -99,8 +102,7 @@ function bump_patch_version
     if [ -z "${patch_line}" ]
     then
         echo "Failed to find line with package version patch"
-        popd > /dev/null
-        return -1
+        return 1
     fi
 
     # get current patch version number and increment it
@@ -109,8 +111,7 @@ function bump_patch_version
     if [ -z "${patch_version}" ]
     then
         echo "Failed to get package version patch number from line ${patch_line}"
-        popd > /dev/null
-        return -1
+        return 1
     fi
 
     patch_version=$((patch_version+1))
@@ -123,7 +124,8 @@ function bump_patch_version
     if [ "${res}" -ne 0 ]
     then
         echo "Failed to replace current with new patch version in line ${patch_line}"
-        popd > /dev/null
+        # TODO: (here and below):
+        # https://github.com/koalaman/shellcheck/wiki/SC2152
         return "${res}"
     fi
 
@@ -132,7 +134,7 @@ function bump_patch_version
 
     # git prints its own error messages
     git add "${project_config}"
-    res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; return "${res}"; fi
+    res="$?"; if [ "${res}" -ne 0 ]; then return "${res}"; fi
 }
 
 
@@ -143,17 +145,38 @@ pushd "${repo_root}" > /dev/null
 # -----------------------------------------------------------------------------
 # bump patch version
 
-echo "Bump patch version in ${repo_root}:"
-
-bump_patch_version "${path_to_proj_conf}"
-
-res="$?"
-
-if [ "${res}" -ne 0 ]
+if [ -d "${path_to_multi_proj_root}" ]
 then
-    echo "Failed to bump patch version in ${path_to_proj_conf}"
-    popd > /dev/null
-    exit "${res}"
+    echo "Multi-package project: ${repo_root}/${path_to_multi_proj_root}"
+    echo
+
+    # TODO: use find to limit list to folders ?
+    # TODO: https://github.com/koalaman/shellcheck/wiki/SC2045
+    for folder in $(ls "${repo_root}/${path_to_multi_proj_root}")
+    do
+        project_conf="${repo_root}/${path_to_multi_proj_root}/${folder}/${path_to_proj_conf}"
+
+        echo "Bump patch version in ${project_conf}"
+        bump_patch_version "${project_conf}"
+
+        if [ "$?" -ne 0 ]
+        then
+            echo "Failed to bump patch version in ${project_conf}"
+            continue
+        fi
+    done
+else
+    echo "Bump patch version in ${path_to_proj_conf}"
+    bump_patch_version "${path_to_proj_conf}"
+
+    res="$?"
+
+    if [ "${res}" -ne 0 ]
+    then
+        echo "Failed to bump patch version in ${path_to_proj_conf}"
+        popd > /dev/null
+        exit "${res}"
+    fi
 fi
 
 # TODO: disabled for development; re-activate
