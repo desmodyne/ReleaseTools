@@ -78,8 +78,10 @@ output=$(git flow release start "${release_name}" 2>&1)
 
 res="$?"
 
-if [ "${res}" -ne 0 ]
+if [ "${res}" -eq 0 ]
 then
+    echo "${output}"
+else
     if [ "${output}" = "${err_msg}" ]
     then
         echo 'Not a gitflow-enabled repo yet; run "git flow init" with defaults:'
