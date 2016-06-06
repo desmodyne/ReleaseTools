@@ -18,6 +18,9 @@ class TtRelease < Formula
   sha256 ""
 
   depends_on "cmake" => :build
+  depends_on "coreutils" # realpath is part of coreutils
+  depends_on "git-flow"
+  depends_on "bash"
   
   def install
     # ENV.deparallelize  # if your formula fails when building in parallel
