@@ -44,7 +44,12 @@ set(CPACK_OUTPUT_FILE_PREFIX            "${CMAKE_SOURCE_DIR}/../${RELATIVE_PACKA
 set(CPACK_DEBIAN_PACKAGE_DEPENDS        "realpath")
 set(CPACK_DEBIAN_PACKAGE_SECTION        "non-free/devel")
 
-install(DIRECTORY ${PROJECT_ROOT}/data/mirror/ DESTINATION / USE_SOURCE_PERMISSIONS)
+if(NOT APPLE)
+  install(DIRECTORY ${PROJECT_ROOT}/data/mirror/ DESTINATION / USE_SOURCE_PERMISSIONS)
+elseif(APPLE)
+  # the install directory for homebrew should be in /usr/local/bin which is different from the debian location
+  install(DIRECTORY ${PROJECT_ROOT}/data/mirror/usr/bin/ DESTINATION /usr/local/bin USE_SOURCE_PERMISSIONS)
+endif(NOT APPLE)
 
 include(CPack)
 
