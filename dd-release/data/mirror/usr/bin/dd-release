@@ -56,3 +56,6 @@ echo
 ./dd-finish-release       "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 echo
+./dd-push-release         "${repo_root}"
+res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+echo
