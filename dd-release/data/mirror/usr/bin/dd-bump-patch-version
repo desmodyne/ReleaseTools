@@ -21,18 +21,18 @@
 # http://apple.stackexchange.com/a/69332
 
 case "${OSTYPE}" in
-  darwin*)
-    grep='ggrep'
-    sed='gsed'
-    ;;
-  linux*)
-    grep='grep'
-    sed='sed'
-    ;;
-  *)
-    echo "Unknown OS: ${OSTYPE}"
-    exit -1
-    ;;
+    darwin*)
+        grep='ggrep'
+        sed='gsed'
+        ;;
+    linux*)
+        grep='grep'
+        sed='sed'
+        ;;
+    *)
+        echo "Unsupported operating system: ${OSTYPE}"
+        exit -1
+        ;;
 esac
 
 
@@ -46,33 +46,44 @@ then
 else
     if [ ! -e "$1" ]
     then
-      echo "$1: No such file or directory"
-      exit -1
+        echo "$1: No such file or directory"
+        exit -1
     fi
     if [ ! -d "$1" ]
     then
-      echo "$1: Not a directory"
-      exit -1
+        echo "$1: Not a directory"
+        exit -1
     fi
 fi
 
 # -----------------------------------------------------------------------------
 # configure script parameters
 
+# absolute path to root folder of repository to process
+repo_root="$(realpath "$1")"
+
 # path to project configuration file, relative to root of target project
-path_to_proj_conf="$1/build/CMakeLists.txt"
+path_to_proj_conf="build/CMakeLists.txt"
 
 # regular expression pattern for line defining patch version
 patch_regex='(set\(CPACK_PACKAGE_VERSION_PATCH\s+")([0-9]+)("\))'
 
+# message for committing changes to project configuration file
+# TODO: add project and release names ?
+commit_message='[#1]: bump patch version'
+
 
 # -----------------------------------------------------------------------------
-# verify project conf exists before accessing it
+# change to target project root directory
+pushd "${repo_root}" > /dev/null
 
+
+# verify project configuration exists before accessing it
 if [ ! -f "${path_to_proj_conf}" ]
 then
-  echo "Failed to find project configuration file: ${path_to_proj_conf}"
-  exit -1
+    echo "Failed to find project configuration file: ${path_to_proj_conf}"
+    popd > /dev/null
+    exit -1
 fi
 
 # bump patch version
@@ -91,3 +102,14 @@ patch_version=$((patch_version+1))
 
 # replace current with new patch version
 "${sed}" -i -r -e "s|${patch_regex}|\1${patch_version}\3|g" "${path_to_proj_conf}"
+
+
+# add and commit changes to git repository
+# TODO: error handling ? get log output ?
+
+git add "${path_to_proj_conf}"
+
+git commit --message "${commit_message}"
+
+
+popd > /dev/null

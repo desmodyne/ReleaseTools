@@ -36,13 +36,13 @@ distribution=$(lsb_release --id --short | tr '[:upper:]' '[:lower:]')
 # determine architecture to determine distribution bitness (e.g. i386, amd64)
 architecture=$(arch)
 
-if   [[ "${architecture}" == 'i686' ]] ;
-  then distribution_folder='binary-i386'
-elif [[ "${architecture}" == 'x86_64' ]] ;
-  then distribution_folder='binary-amd64'
+if   [[ "${architecture}" == 'i686' ]]
+    then distribution_folder='binary-i386'
+elif [[ "${architecture}" == 'x86_64' ]]
+    then distribution_folder='binary-amd64'
 else
-  echo "Unsupported architecture ${architecture}"
-  exit -1
+    echo "Unsupported architecture ${architecture}"
+    exit -1
 fi
 
 # archive area: http://askubuntu.com/a/27514
@@ -55,27 +55,27 @@ git_branch=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
 if [[ "${git_branch}" != 'develop' &&
       "${git_branch}" !=  feature* &&
       "${git_branch}" != 'master'  &&
-      "${git_branch}" !=  release* ]] ;
-  then
-      echo "Unsupported git branch / distribution channel ${git_branch}"
-      exit -1
+      "${git_branch}" !=  release* ]]
+then
+    echo "Unsupported git branch / distribution channel ${git_branch}"
+    exit -1
 fi
 
-if [ ! -z "$1" ] ;
-  then
+if [ ! -z "$1" ]
+then
     distribution_channel="$1"
     message="using command line argument, sync'ing to ${distribution_channel} channel at"
 else
-  if   [[ "${git_branch}" ==  'develop' ]] ;
-    then distribution_channel='develop'
-  elif [[ "${git_branch}" ==   feature* ]] ;
-    then distribution_channel='feature'
-  elif [[ "${git_branch}" ==  'master'  ]] ;
-    then distribution_channel='master'
-  elif [[ "${git_branch}" ==   release* ]] ;
-    then distribution_channel='release'
-  fi
-  message="on ${git_branch} git branch, sync'ing to ${distribution_channel} channel at"
+    if   [[ "${git_branch}" ==  'develop' ]]
+        then distribution_channel='develop'
+    elif [[ "${git_branch}" ==   feature* ]]
+        then distribution_channel='feature'
+    elif [[ "${git_branch}" ==  'master'  ]]
+        then distribution_channel='master'
+    elif [[ "${git_branch}" ==   release* ]]
+        then distribution_channel='release'
+    fi
+    message="on ${git_branch} git branch, sync'ing to ${distribution_channel} channel at"
 fi
 
 # remote server and folder to upload to

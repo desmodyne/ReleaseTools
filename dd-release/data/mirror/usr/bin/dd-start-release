@@ -19,13 +19,13 @@ then
 else
     if [ ! -e "$1" ]
     then
-      echo "$1: No such file or directory"
-      exit -1
+        echo "$1: No such file or directory"
+        exit -1
     fi
     if [ ! -d "$1" ]
     then
-      echo "$1: Not a directory"
-      exit -1
+        echo "$1: Not a directory"
+        exit -1
     fi
 fi
 
@@ -34,6 +34,21 @@ fi
 # TODO: script return value when run as Jenkins job ?!?
 # TODO: run git flow init if required ?
 # TODO: verify release branch to create does not exist on remote yet ?
+# TODO: add leading zero to calender week in release name
+# TODO: do something with the output when script succeeds, e.g.
+# Creating release 2016.21 in <path to project root>:
+# Switched to a new branch 'release/2016.21'
+#
+# Summary of actions:
+# - A new branch 'release/2016.21' was created, based on 'develop'
+# - You are now on branch 'release/2016.21'
+#
+# Follow-up actions:
+# - Bump the version number now!
+# - Start committing last-minute fixes in preparing your release
+# - When done, run:
+#
+#      git flow release finish '2016.21'
 
 
 # -----------------------------------------------------------------------------
