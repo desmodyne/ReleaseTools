@@ -56,8 +56,15 @@ pushd "${repo_root}" > /dev/null
 # -----------------------------------------------------------------------------
 # push the release
 
-# TODO: test if tag exists and only push if it does
+# TODO: test if tag exists locally and only push if it does
 # TODO: don't push all tags: git push  <REMOTENAME> <TAGNAME>
+# TODO: deal with improperly set up remotes not using 'origin':
+# git flow heavily relies on that convention:
+#   fatal: No configured push destination.
+#   Either specify the URL from the command-line or configure a remote repository using
+#       git remote add <name> <url>
+#   and then push using the remote name
+#       git push <name>
 
 echo "Push release tag ${release_name} in ${repo_root}:"
 git push --tags
