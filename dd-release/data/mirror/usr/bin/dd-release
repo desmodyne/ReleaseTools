@@ -53,9 +53,17 @@ echo
 ./dd-create-release-notes "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 echo
-./dd-finish-release       "${repo_root}"
-res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
-echo
+
+# TODO: this must not be done automatically,
+# but only after (manual) test and approval
+
+# ./dd-finish-release       "${repo_root}"
+# res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+# echo
+
+# NOTE: pushing tags here does not have any
+# effect as there are not new tags yet
+
 ./dd-push-release         "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 echo
