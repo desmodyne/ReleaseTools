@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# dd-push-release
+# dd-push-release-branch
 #
-# push a software release (i.e. its tag)
+# push a release branch to remote git repo
 #
 # author  : stefan schablowski
 # contact : stefan.schablowski@desmodyne.com
@@ -54,10 +54,13 @@ pushd "${repo_root}" > /dev/null
 
 
 # -----------------------------------------------------------------------------
-# push the release
+# push the release branch
 
-# TODO: test if tag exists locally and only push if it does
-# TODO: don't push all tags: git push  <REMOTENAME> <TAGNAME>
+# NOTE: this script expects to be called in the following context:
+# dd-release has started a release, bumped the patch version and created
+# release notes; the target repo is on the release branch and there are no
+# tags yet; only the release branch needs to be pushed to origin
+
 # TODO: deal with improperly set up remotes not using 'origin':
 # git flow heavily relies on that convention:
 #   fatal: No configured push destination.
@@ -66,24 +69,12 @@ pushd "${repo_root}" > /dev/null
 #   and then push using the remote name
 #       git push <name>
 
-echo "Push release tag ${release_name} in ${repo_root}:"
-git push --tags
-
-res="$?"
-
-if [ "${res}" -ne 0 ]
-then
-    # git push prints its own error messages
-    popd > /dev/null
-    exit "${res}"
-fi
-
 # NOTE: 'git push' alone fails with e.g.
 # fatal: The current branch release/2016.22 has no upstream branch.
 # To push the current branch and set the remote as upstream, use
 #     git push --set-upstream origin release/2016.22
 
-echo "Push changes to default remote:"
+echo "Push release branch ${rel_prefix}/${release_name} to origin:"
 git push origin --set-upstream "${rel_prefix}/${release_name}"
 
 res="$?"

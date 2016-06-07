@@ -44,7 +44,7 @@ repo_root="$(realpath "$1")"
 # TODO: this assumes the script is called from the folder it is located in
 
 echo
-./dd-start-release        "${repo_root}"
+./dd-start-release "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 echo
 
@@ -58,7 +58,7 @@ then
     echo "${message}"
     echo
 else
-    ./dd-bump-patch-version   "${repo_root}"
+    ./dd-bump-patch-version "${repo_root}"
     res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
     echo
 fi
@@ -67,16 +67,6 @@ fi
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 echo
 
-# TODO: this must not be done automatically,
-# but only after (manual) test and approval
-
-# ./dd-finish-release       "${repo_root}"
-# res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
-# echo
-
-# NOTE: pushing tags here does not have any
-# effect as there are not new tags yet
-
-./dd-push-release         "${repo_root}"
+./dd-push-release-branch "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 echo
