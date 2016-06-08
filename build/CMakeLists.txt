@@ -27,7 +27,7 @@ set(CPACK_PACKAGE_DESCRIPTION_FILE      "${PROJECT_ROOT}/deploy/PackageDescripti
 
 set(CPACK_INSTALL_CMAKE_PROJECTS        "${CMAKE_CURRENT_BINARY_DIR};${PROJECT_NAME};ALL;/")
 set(CPACK_OUTPUT_CONFIG_FILE            "${CMAKE_CURRENT_BINARY_DIR}/CPack${PROJECT_NAME}Config.cmake")
-set(CPACK_OUTPUT_FILE_PREFIX            "${CMAKE_BINARY_DIR}/packages")
+set(CPACK_OUTPUT_FILE_PREFIX            "${CMAKE_BINARY_DIR}/../artifacts")
 
 set(CPACK_DEBIAN_PACKAGE_DEPENDS        "bash, git-flow, realpath")
 set(CPACK_DEBIAN_PACKAGE_SECTION        "non-free/devel")
