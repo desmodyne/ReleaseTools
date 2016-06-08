@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# build-package
+# dd-build-debian-package
 #
 # build Debian package
 #
@@ -9,7 +9,34 @@
 # created : 2016-06-01
 
 
-# TODO: make sure this is only run on a Debian system
+# -----------------------------------------------------------------------------
+# determine platform: http://stackoverflow.com/a/18434831
+
+case "${OSTYPE}" in
+    linux*)
+        dist_name=$(lsb_release --id --short)
+
+        res="$?"
+
+        if [ "${res}" -eq 0 ]
+        then
+            # make sure this is run only on Debian / Ubuntu systems
+            if [ "${dist_name}" != 'Debian' -a "${dist_name}" != 'Ubuntu' ]
+            then
+                echo "Unsupported Linux distribution: ${dist_name}"
+                exit -1
+            fi
+        else
+            echo "Could not determine Linux distribution name"
+            exit "${res}"
+        fi
+
+        ;;
+    *)
+        echo "Unsupported operating system: ${OSTYPE}"
+        exit -1
+        ;;
+esac
 
 
 # -----------------------------------------------------------------------------
@@ -18,16 +45,16 @@
 # absolute path to this script: http://stackoverflow.com/a/9107028
 path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# path from this script to project root
-rel_path_to_project_root='../..'
+# relative path from this script to project root
+rel_path_to_project_root='../../../..'
 
 # absolute path to project root
 # on Debian, install realpath using e.g. aptitude install realpath
 # on OS X, use grealpath: http://apple.stackexchange.com/a/88812
-abs_path_to_project_root="$(realpath "${path_to_this_script}/${rel_path_to_project_root}")"
+path_to_project_root="$(realpath "${path_to_this_script}/${rel_path_to_project_root}")"
 
 # get project name from project root folder
-project_name="$(basename "${abs_path_to_project_root}")"
+project_name="$(basename "${path_to_project_root}")"
 
 # path to temporary working folder, relative to project root
 working_folder='../tmp/deploy'
@@ -37,8 +64,11 @@ path_from_working_folder_to_project_root="../../${project_name}"
 
 
 # -----------------------------------------------------------------------------
+# build debian package
+
+
 # change to project root directory
-pushd "${abs_path_to_project_root}" > /dev/null
+pushd "${path_to_project_root}" > /dev/null
 
 
 # remove and (re-) create temporary working folder
@@ -51,7 +81,8 @@ mkdir -p "${working_folder}"
 # change to working folder
 pushd "${working_folder}" > /dev/null
 
-# delete files OS X keeps creating so they are not added to the package
+# delete files OS X keeps creating so they are not added to the package;
+# this occurs with project spaces shared between OSs, e.g. using sshfs
 find . \( -iname '._*' -or -iname '.DS_Store' \) -delete
 
 # build the package
