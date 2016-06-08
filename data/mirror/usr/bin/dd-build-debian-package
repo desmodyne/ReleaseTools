@@ -119,12 +119,13 @@ then
     make package
 elif [[ "${project_name}" == 'ChronicServer' ]]
 then
-  # this works with ChronicServer
-    for package in $(find . -maxdepth 1 -mindepth 1 -type d ! -iname "CMakeFiles" | sed "s|^\./||" )
+    # this works with ChronicServer
+    for package_path in $(find "${repo_root}/packages" -maxdepth 1 -mindepth 1 -type d | sort)
     do
-      echo "${package}":
-      # make "${package}"-package
-      echo
+        package=$(basename "${package_path}")
+        echo "${package}":
+        make "${package}"-package
+        echo
     done
 else
     # this works with this project
