@@ -110,7 +110,10 @@ find . \( -iname '._*' -or -iname '.DS_Store' \) -delete
 
 # build the package
 cmake "${path_from_working_folder_to_project_root}/build"
-make "${project_name}-package"
+# TODO: this works with ChronicClient
+make package
+# TODO: this works with other projects
+# make "${project_name}-package"
 
 # change back to previous location
 popd > /dev/null
