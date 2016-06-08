@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-# dd-build-debian-package
+# dd-lint-debian-package
 #
-# build Debian package
+# checks Debian software packages for common issues
 #
 # author  : stefan schablowski
 # contact : stefan.schablowski@desmodyne.com
-# created : 2016-06-01
+# created : 2016-06-08
 
 
 # -----------------------------------------------------------------------------
@@ -68,9 +68,6 @@ fi
 # -----------------------------------------------------------------------------
 # configure script parameters
 
-# name of this script: http://stackoverflow.com/q/192319
-script_name="$(basename "$0")"
-
 # absolute path to the root folder of the repository to process
 # on Debian, install realpath using e.g. aptitude install realpath
 # on OS X, use grealpath: http://apple.stackexchange.com/a/88812
@@ -82,57 +79,12 @@ project_name="$(basename "${repo_root}")"
 # package 'base' name is project name in lower case
 package_name="$(echo "${project_name}" | tr '[:upper:]' '[:lower:]')"
 
-# path to temporary working folder, relative to target project root
-working_folder="../Temp/${project_name}/${script_name}"
-
-# path from working folder back to target project root
-path_from_working_folder_to_project_root="../../../${project_name}"
+# absolute path to artifacts folder
+artifacts_folder=$(realpath "${repo_root}/../Temp/${project_name}/artifacts")
 
 
 # -----------------------------------------------------------------------------
-# build debian package
+# lint debian package
 
-
-# change to target project root directory
-pushd "${repo_root}" > /dev/null
-
-
-# remove and (re-) create temporary working folder
-if [ -d "${working_folder}" ]
-then
-    rm -r "${working_folder}"
-fi
-mkdir -p "${working_folder}"
-
-# change to working folder
-pushd "${working_folder}" > /dev/null
-
-# delete files OS X keeps creating so they are not added to the package;
-# this occurs with project spaces shared between OSs, e.g. using sshfs
-find . \( -iname '._*' -or -iname '.DS_Store' \) -delete
-
-# build the package
-cmake "${path_from_working_folder_to_project_root}/build"
-
-# TODO: distinguish regular vs. multi-package projects
-
-if [[ "${project_name}" == 'ChronicServer' ]]
-then
-    # this works with ChronicServer
-    for package_path in $(find "${repo_root}/packages" -maxdepth 1 -mindepth 1 -type d | sort)
-    do
-        package_name=$(basename "${package_path}")
-        echo "${package_name}":
-        make "${package_name}"-package
-        echo
-    done
-else
-    make "${package_name}-package"
-fi
-
-# change back to previous location
-popd > /dev/null
-
-
-# change back to previous location
-popd > /dev/null
+# TODO: review path and glob
+lintian "${artifacts_folder}/${package_name}"*.deb
