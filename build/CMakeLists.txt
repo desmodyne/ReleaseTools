@@ -8,9 +8,9 @@
 
 cmake_minimum_required(VERSION 2.6)
 
-# TODO: get project name from project root folder ?
-# see .../code/bin/build-package for bash approach
-project(ReleaseTools)
+# TODO: get project name from project root folder
+# and convert to lower case for package name:
+project(releasetools)
 
 get_filename_component(PROJECT_ROOT "${PROJECT_SOURCE_DIR}/.." REALPATH)
 
