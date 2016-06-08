@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# dd-build-debian-package
+# dd-create-debian-package
 #
-# build Debian package
+# create Debian package
 #
 # author  : stefan schablowski
 # contact : stefan.schablowski@desmodyne.com
@@ -90,7 +90,7 @@ path_from_working_folder_to_project_root="../../../${project_name}"
 
 
 # -----------------------------------------------------------------------------
-# build debian package
+# create debian package
 
 
 # change to target project root directory
