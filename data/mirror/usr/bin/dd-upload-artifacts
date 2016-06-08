@@ -1,15 +1,42 @@
 #!/usr/bin/env bash
 
-# upload-package
+# dd-upload-artifacts
 #
-# upload package to distribution server
+# upload build artifacts to distribution server
 #
 # author  : stefan schablowski
 # contact : stefan.schablowski@desmodyne.com
 # created : 2016-06-02
 
 
-# TODO: make sure this is only run on a Debian or Ubuntu system
+# -----------------------------------------------------------------------------
+# determine platform: http://stackoverflow.com/a/18434831
+
+case "${OSTYPE}" in
+    linux*)
+        dist_name=$(lsb_release --id --short)
+
+        res="$?"
+
+        if [ "${res}" -eq 0 ]
+        then
+            # make sure this is run only on Debian / Ubuntu systems
+            if [ "${dist_name}" != 'Debian' ] && [ "${dist_name}" != 'Ubuntu' ]
+            then
+                echo "Unsupported Linux distribution: ${dist_name}"
+                exit -1
+            fi
+        else
+            echo "Could not determine Linux distribution name"
+            exit "${res}"
+        fi
+
+        ;;
+    *)
+        echo "Unsupported operating system: ${OSTYPE}"
+        exit -1
+        ;;
+esac
 
 
 # -----------------------------------------------------------------------------
@@ -19,16 +46,14 @@
 path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # path from this script to project root
-path_to_project_root='../..'
+path_to_project_root='../../../..'
 
 # absolute path to local folder to upload
-local_folder="${path_to_this_script}/${path_to_project_root}/../tmp/deploy/packages"
+local_folder="${path_to_this_script}/${path_to_project_root}/../Temp/ReleaseTools/artifacts"
 
 # these assume packages being uploaded were built on this host
 # and there is no "cross-package-building" taking place, ie.
 # no creating Debian 32-bit packages on a Ubuntu 64-bit host
-
-# TODO: check first if required executables are available
 
 # determine Linux distribution (e.g. Debian, Ubuntu)
 distribution=$(lsb_release --id --short | tr '[:upper:]' '[:lower:]')
@@ -91,4 +116,4 @@ echo "${message}"
 echo "${remote_folder}:"
 echo
 
-rsync --archive --checksum --verbose "${local_folder}/" "${remote_folder}"
+rsync --archive --checksum --dry-run --verbose "${local_folder}/" "${remote_folder}"
