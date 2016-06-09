@@ -80,11 +80,14 @@ repo_root="$(realpath "$1")"
 # get name of target project from repository root
 project_name="$(basename "${repo_root}")"
 
+# aboslute path to target project configuration
+project_conf="${repo_root}/project.json"
+
 # package 'base' name is project name in lower case
 package_name="$(echo "${project_name}" | tr '[:upper:]' '[:lower:]')"
 
-# absolute path to artifacts folder
-artifacts_folder=$(realpath "${repo_root}/../Temp/${project_name}/artifacts")
+# absolute path to artifacts base folder
+artifacts_base=$(realpath "${repo_root}/../Temp/${project_name}/artifacts")
 
 # these assume packages being uploaded were built on this host
 # and there is no "cross-package-building" taking place, ie.
@@ -131,30 +134,92 @@ elif [[ "${git_branch}" ==   release* ]]
     then distribution_channel='release'
 fi
 
+# user with write privileges on distribution channels
+declare -A channel_privileges=\
+(                               \
+  ["develop"]="desmodyne"     \
+  ["feature"]="desmodyne"     \
+  ["master"]="bob.the.builder"  \
+  ["release"]="bob.the.builder" \
+)
+
+# list of currently supported artifacts types
+# TODO: this should probably come from somewhere global
+supported_artifacts_types='configuration downloads packages'
+
 # first part of remote server and folder location; defined by us
 # NOTE: 'update' server name is defined in DesmoDyne corporate name server
 # NOTE: this assumes access to remote server using SSH key is fully set up
-remote_loc_base='update:/var/www/desmodyne.com/packages/public_html/protected'
+remote_loc_tmpl='update:/var/www/desmodyne.com/%s/public_html/protected'
 
 # second part of remote server and folder location; defined by Debian standard
 remote_loc_leaf="${distribution}/dists/${distribution_channel}/"
 remote_loc_leaf+="${archive_area}/${distribution_folder}"
-
-# complete remote server and folder to upload to
-remote_location="${remote_loc_base}/${remote_loc_leaf}"
 
 # rsync switches
 rsync_switches='--archive --checksum --verbose'
 
 
 # -----------------------------------------------------------------------------
-# sync local to remote folder
+# get artifacts mapping from target project
+
+# TODO: check if agent is already running; re-use
+
+echo -n 'Require SSH key to upload to remote server. '
+eval "$(ssh-agent -s)" > /dev/null
+ssh-add ~/.ssh/id_rsa_"${channel_privileges[${distribution_channel}]}"
+echo
 
 message="repository at ${repo_root} is on git branch ${git_branch}, "
-message+="sync'ing local folder ${artifacts_folder} to ${distribution_channel} "
-message+="channel at ${remote_location}:"
+message+="sync to ${distribution_channel} channel:"
 
 echo "${message}"
+echo
 
-echo "rsync ${rsync_switches} ${artifacts_folder}/ ${remote_location}"
-rsync ${rsync_switches} "${artifacts_folder}/" "${remote_location}"
+artifacts_json="$(jq '.Artifacts' ${project_conf})"
+artifacts_types="$(echo ${artifacts_json} | jq -r 'keys[]' )"
+
+for artifacts_type in ${artifacts_types}
+do
+    # http://stackoverflow.com/a/8063398
+    if [[ ! " ${supported_artifacts_types} " =~ " ${artifacts_type} " ]]
+    then
+        echo "Unsupported artifact type ${artifacts_type}"
+        continue
+    fi
+
+    # -------------------------------------------------------------------------
+    # sync local to remote folder
+
+    echo "${artifacts_type}:"
+    echo
+
+    # TODO: support globs ?
+
+    # local folder to upload, relative to target project root
+    rel_local_folder="$(echo ${artifacts_json} | jq -r ".${artifacts_type}" )"
+
+    # absolute path to local folder to upload
+    abs_local_folder="${repo_root}/${rel_local_folder}"
+
+    if [ ! -e "${abs_local_folder}" ]
+    then
+        echo "${abs_local_folder}: No such file or directory"
+        continue
+    fi
+    if [ ! -d "${abs_local_folder}" ]
+    then
+        echo "${abs_local_folder}: Not a directory"
+        continue
+    fi
+
+    local_folder="$(realpath "${abs_local_folder}")"
+
+    # complete remote server and folder to upload to
+    remote_location="$(printf ${remote_loc_tmpl} ${artifacts_type})/${remote_loc_leaf}"
+
+    printf "sync ${local_folder}\nto   ${remote_location}:\n"
+    echo "rsync ${rsync_switches} ${local_folder}/ ${remote_location}"
+    rsync ${rsync_switches} "${local_folder}/" "${remote_location}"
+    echo
+done
