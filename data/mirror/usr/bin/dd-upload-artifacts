@@ -39,17 +39,52 @@ case "${OSTYPE}" in
 esac
 
 
+# ----------------------------------------a-------------------------------------
+# process command line arguments
+
+# TODO: support passing distribution channel as second argument ?
+
+# if [ ! -z "$2" ]
+# then
+#     # TODO: test channel is supported
+#     distribution_channel="$1"
+#     message="using command line argument, sync'ing to ${distribution_channel} channel at"
+# fi
+
+if [ $# -ne 1 ]
+then
+    echo "Usage: $(basename "$0") <repository root folder>"
+    exit -1
+else
+    if [ ! -e "$1" ]
+    then
+        echo "$1: No such file or directory"
+        exit -1
+    fi
+    if [ ! -d "$1" ]
+    then
+        echo "$1: Not a directory"
+        exit -1
+    fi
+fi
+
+
 # -----------------------------------------------------------------------------
 # configure script parameters
 
-# absolute path to this script: http://stackoverflow.com/a/9107028
-path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# absolute path to the root folder of the repository to process
+# on Debian, install realpath using e.g. aptitude install realpath
+# on OS X, use grealpath: http://apple.stackexchange.com/a/88812
+repo_root="$(realpath "$1")"
 
-# path from this script to project root
-path_to_project_root='../../../..'
+# get name of target project from repository root
+project_name="$(basename "${repo_root}")"
 
-# absolute path to local folder to upload
-local_folder="${path_to_this_script}/${path_to_project_root}/../Temp/ReleaseTools/artifacts"
+# package 'base' name is project name in lower case
+package_name="$(echo "${project_name}" | tr '[:upper:]' '[:lower:]')"
+
+# absolute path to artifacts folder
+artifacts_folder=$(realpath "${repo_root}/../Temp/${project_name}/artifacts")
 
 # these assume packages being uploaded were built on this host
 # and there is no "cross-package-building" taking place, ie.
@@ -86,34 +121,40 @@ then
     exit -1
 fi
 
-if [ ! -z "$1" ]
-then
-    distribution_channel="$1"
-    message="using command line argument, sync'ing to ${distribution_channel} channel at"
-else
-    if   [[ "${git_branch}" ==  'develop' ]]
-        then distribution_channel='develop'
-    elif [[ "${git_branch}" ==   feature* ]]
-        then distribution_channel='feature'
-    elif [[ "${git_branch}" ==  'master'  ]]
-        then distribution_channel='master'
-    elif [[ "${git_branch}" ==   release* ]]
-        then distribution_channel='release'
-    fi
-    message="on ${git_branch} git branch, sync'ing to ${distribution_channel} channel at"
+if   [[ "${git_branch}" ==  'develop' ]]
+    then distribution_channel='develop'
+elif [[ "${git_branch}" ==   feature* ]]
+    then distribution_channel='feature'
+elif [[ "${git_branch}" ==  'master'  ]]
+    then distribution_channel='master'
+elif [[ "${git_branch}" ==   release* ]]
+    then distribution_channel='release'
 fi
 
-# remote server and folder to upload to
-# NOTE: this assumes remote access by SSH key being fully set up
-remote_folder="update:/var/www/desmodyne.com/packages/public_html/protected/${distribution}/dists/${distribution_channel}/${archive_area}/${distribution_folder}"
+# first part of remote server and folder location; defined by us
+# NOTE: 'update' server name is defined in DesmoDyne corporate name server
+# NOTE: this assumes access to remote server using SSH key is fully set up
+remote_loc_base='update:/var/www/desmodyne.com/packages/public_html/protected'
+
+# second part of remote server and folder location; defined by Debian standard
+remote_loc_leaf="${distribution}/dists/${distribution_channel}/"
+remote_loc_leaf+="${archive_area}/${distribution_folder}"
+
+# complete remote server and folder to upload to
+remote_location="${remote_loc_base}/${remote_loc_leaf}"
+
+# rsync switches
+rsync_switches='--archive --checksum --verbose'
 
 
 # -----------------------------------------------------------------------------
 # sync local to remote folder
 
-echo
-echo "${message}"
-echo "${remote_folder}:"
-echo
+message="repository at ${repo_root} is on git branch ${git_branch}, "
+message+="sync'ing local folder ${artifacts_folder} to ${distribution_channel} "
+message+="channel at ${remote_location}:"
 
-rsync --archive --checksum --dry-run --verbose "${local_folder}/" "${remote_folder}"
+echo "${message}"
+
+echo "rsync ${rsync_switches} ${artifacts_folder}/ ${remote_location}"
+rsync ${rsync_switches} "${artifacts_folder}/" "${remote_location}"
