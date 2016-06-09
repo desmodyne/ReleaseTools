@@ -87,4 +87,9 @@ artifacts_folder=$(realpath "${repo_root}/../Temp/${project_name}/artifacts")
 # lint debian package
 
 # TODO: review path and glob
-lintian "${artifacts_folder}/${package_name}"*.deb
+for package_filename in "${artifacts_folder}/${package_name}"*.deb
+do
+    echo
+    echo "lintian ${package_filename}:"
+    lintian ${package_filename}
+done

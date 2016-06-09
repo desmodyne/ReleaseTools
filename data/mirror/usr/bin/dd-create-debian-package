@@ -109,6 +109,7 @@ pushd "${working_folder}" > /dev/null
 
 # delete files OS X keeps creating so they are not added to the package;
 # this occurs with project spaces shared between OSs, e.g. using sshfs
+# TODO: lintian reports these, use messages to review / debug this
 find . \( -iname '._*' -or -iname '.DS_Store' \) -delete
 
 # build the package
