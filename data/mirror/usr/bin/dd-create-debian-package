@@ -121,7 +121,7 @@ cmake -D skip-cfgserver=TRUE -D skip-nmeator=TRUE \
 
 make -j5
 
-# TODO: distinguish regular vs. multi-package projects
+# TODO: distinguish single vs. multi-package projects
 
 if [[ "${project_name}" == 'ChronicServer' ]]
 then
@@ -134,7 +134,7 @@ then
             continue
         fi
         echo "${package_name}":
-        make "${package_name}"-package
+        make "${package_name}-package"
         echo
     done
 else

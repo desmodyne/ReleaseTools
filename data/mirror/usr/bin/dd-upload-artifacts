@@ -77,17 +77,8 @@ fi
 # on OS X, use grealpath: http://apple.stackexchange.com/a/88812
 repo_root="$(realpath "$1")"
 
-# get name of target project from repository root
-project_name="$(basename "${repo_root}")"
-
 # aboslute path to target project configuration
 project_conf="${repo_root}/project.json"
-
-# package 'base' name is project name in lower case
-package_name="$(echo "${project_name}" | tr '[:upper:]' '[:lower:]')"
-
-# absolute path to artifacts base folder
-artifacts_base=$(realpath "${repo_root}/../Temp/${project_name}/artifacts")
 
 # these assume packages being uploaded were built on this host
 # and there is no "cross-package-building" taking place, ie.
@@ -157,10 +148,14 @@ remote_loc_tmpl='update:/var/www/desmodyne.com/%s/public_html/protected'
 declare -A remote_loc_leaves
 
 # configuration is yet to be amended by ship name; downloads isn't used yet
-remote_loc_leaves["configuration"]="%s/${distribution_channel}"
-remote_loc_leaves["downloads"]=""
-remote_loc_leaves["packages"]="${distribution}/dists/${distribution_channel}/"
-remote_loc_leaves["packages"]+="${archive_area}/${distribution_folder}"
+# TODO: shellcheck seems to be a little overactive here...
+# shellcheck disable=SC2154
+remote_loc_leaves['configuration']="%s/${distribution_channel}"
+# shellcheck disable=SC2154
+remote_loc_leaves['downloads']=""
+# shellcheck disable=SC2154
+remote_loc_leaves['packages']="${distribution}/dists/${distribution_channel}/"
+remote_loc_leaves['packages']+="${archive_area}/${distribution_folder}"
 
 # rsync switches
 rsync_switches='--archive --checksum --verbose'
@@ -182,12 +177,13 @@ message+="sync to ${distribution_channel} channel:"
 echo "${message}"
 echo
 
-artifacts_json="$(jq '.Artifacts' ${project_conf})"
-artifacts_types="$(echo ${artifacts_json} | jq -r 'keys[]' )"
+artifacts_json="$(jq '.Artifacts' "${project_conf}")"
+artifacts_types="$(echo "${artifacts_json}" | jq -r 'keys[]' )"
 
 for artifacts_type in ${artifacts_types}
 do
     # http://stackoverflow.com/a/8063398
+    # shellcheck disable=SC2076
     if [[ ! " ${supported_artifacts_types} " =~ " ${artifacts_type} " ]]
     then
         echo "Unsupported artifact type ${artifacts_type}"
@@ -203,7 +199,7 @@ do
     # TODO: support globs ?
 
     # local folder to upload, relative to target project root
-    rel_local_folder="$(echo ${artifacts_json} | jq -r ".${artifacts_type}" )"
+    rel_local_folder="$(echo "${artifacts_json}" | jq -r ".${artifacts_type}")"
 
     # absolute path to local folder to upload
     abs_local_folder="${repo_root}/${rel_local_folder}"
@@ -226,14 +222,17 @@ do
 
     if [ "${artifacts_type}" = 'configuration' ]
     then
-        ship_name="$(jq -r '.ShipName' ${project_conf})"
+        ship_name="$(jq -r '.ShipName' "${project_conf}")"
+        # shellcheck disable=SC2059
         remote_loc_leaf=$(printf "${remote_loc_leaf}" "${ship_name}")
     fi
 
-    remote_location="$(printf ${remote_loc_tmpl} ${artifacts_type})/${remote_loc_leaf}"
+    # shellcheck disable=SC2059
+    remote_location="$(printf "${remote_loc_tmpl}" "${artifacts_type}")/${remote_loc_leaf}"
 
-    printf "sync ${local_folder}\nto   ${remote_location}:\n"
+    printf "sync %s\nto   %s:\n" "${local_folder}" "${remote_location}"
     echo "rsync ${rsync_switches} ${local_folder}/ ${remote_location}"
+    # shellcheck disable=SC2086
     rsync ${rsync_switches} "${local_folder}/" "${remote_location}"
     echo
 done
