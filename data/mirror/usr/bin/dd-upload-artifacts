@@ -137,10 +137,10 @@ fi
 # user with write privileges on distribution channels
 declare -A channel_privileges=\
 (                               \
-  ["develop"]="desmodyne"     \
-  ["feature"]="desmodyne"     \
-  ["master"]="bob.the.builder"  \
-  ["release"]="bob.the.builder" \
+    ["develop"]="desmodyne"     \
+    ["feature"]="desmodyne"     \
+    ["master"]="bob.the.builder"  \
+    ["release"]="bob.the.builder" \
 )
 
 # list of currently supported artifacts types
@@ -152,9 +152,15 @@ supported_artifacts_types='configuration downloads packages'
 # NOTE: this assumes access to remote server using SSH key is fully set up
 remote_loc_tmpl='update:/var/www/desmodyne.com/%s/public_html/protected'
 
-# second part of remote server and folder location; defined by Debian standard
-remote_loc_leaf="${distribution}/dists/${distribution_channel}/"
-remote_loc_leaf+="${archive_area}/${distribution_folder}"
+# second part of remote server and folder location;
+# defined by Debian standard for packages; defined by us for all other
+declare -A remote_loc_leaves
+
+# configuration is yet to be amended by ship name; downloads isn't used yet
+remote_loc_leaves["configuration"]="%s/${distribution_channel}"
+remote_loc_leaves["downloads"]=""
+remote_loc_leaves["packages"]="${distribution}/dists/${distribution_channel}/"
+remote_loc_leaves["packages"]+="${archive_area}/${distribution_folder}"
 
 # rsync switches
 rsync_switches='--archive --checksum --verbose'
@@ -215,7 +221,15 @@ do
 
     local_folder="$(realpath "${abs_local_folder}")"
 
-    # complete remote server and folder to upload to
+    # remote server and folder to upload to
+    remote_loc_leaf="${remote_loc_leaves[$artifacts_type]}"
+
+    if [ "${artifacts_type}" = 'configuration' ]
+    then
+        ship_name="$(jq -r '.ShipName' ${project_conf})"
+        remote_loc_leaf=$(printf "${remote_loc_leaf}" "${ship_name}")
+    fi
+
     remote_location="$(printf ${remote_loc_tmpl} ${artifacts_type})/${remote_loc_leaf}"
 
     printf "sync ${local_folder}\nto   ${remote_location}:\n"
