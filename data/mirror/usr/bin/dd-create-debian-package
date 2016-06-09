@@ -112,8 +112,14 @@ pushd "${working_folder}" > /dev/null
 # TODO: lintian reports these, use messages to review / debug this
 find . \( -iname '._*' -or -iname '.DS_Store' \) -delete
 
-# build the package
-cmake "${path_from_working_folder_to_project_root}/build"
+# TODO: distinguish building code vs. building packages ?
+
+# build the project
+# TODO: do this algorithmically (here and below)
+cmake -D skip-cfgserver=TRUE -D skip-nmeator=TRUE \
+      "${path_from_working_folder_to_project_root}/build"
+
+make -j5
 
 # TODO: distinguish regular vs. multi-package projects
 
@@ -123,6 +129,10 @@ then
     for package_path in $(find "${repo_root}/packages" -maxdepth 1 -mindepth 1 -type d | sort)
     do
         package_name=$(basename "${package_path}")
+        if [ "${package_name}" == 'cfgserver' ] || [ "${package_name}" == 'nmeator' ]
+        then
+            continue
+        fi
         echo "${package_name}":
         make "${package_name}"-package
         echo
