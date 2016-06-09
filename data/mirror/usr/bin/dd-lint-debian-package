@@ -73,23 +73,33 @@ fi
 # on OS X, use grealpath: http://apple.stackexchange.com/a/88812
 repo_root="$(realpath "$1")"
 
-# get name of target project from repository root
-project_name="$(basename "${repo_root}")"
+# absolute path to target project configuration
+project_conf="${repo_root}/project.json"
 
-# package 'base' name is project name in lower case
-package_name="$(echo "${project_name}" | tr '[:upper:]' '[:lower:]')"
+# absolute path to packages folder
+packages_folder="${repo_root}/$(jq -r '.Artifacts.packages' "${project_conf}")"
 
-# absolute path to artifacts folder
-artifacts_folder=$(realpath "${repo_root}/../Temp/${project_name}/artifacts")
+if [ ! -e "${packages_folder}" ]
+then
+    echo "${packages_folder}: No such file or directory"
+    exit -1
+fi
+if [ ! -d "${packages_folder}" ]
+then
+    echo "${packages_folder}: Not a directory"
+    exit -1
+fi
+
+packages_folder="$(realpath "${packages_folder}")"
 
 
 # -----------------------------------------------------------------------------
 # lint debian package
 
 # TODO: review path and glob
-for package_filename in "${artifacts_folder}"/*.deb
+for package_filename in "${packages_folder}"/*.deb
 do
     echo
     echo "lintian ${package_filename}:"
-    lintian ${package_filename}
+    lintian "${package_filename}"
 done
