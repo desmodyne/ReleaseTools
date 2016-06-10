@@ -116,6 +116,11 @@ find . \( -iname '._*' -or -iname '.DS_Store' \) -delete
 
 # build the project
 # TODO: do this algorithmically (here and below)
+# TODO: fix warning in projects other than ChronicServer:
+# CMake Warning:
+# Manually-specified variables were not used by the project:
+#    skip-cfgserver
+#    skip-nmeator
 cmake -D skip-cfgserver=TRUE -D skip-nmeator=TRUE \
       "${path_from_working_folder_to_project_root}/build"
 

@@ -8,6 +8,16 @@
 
 cmake_minimum_required(VERSION 2.6)
 
+function(get_project_setting json_key result)
+    execute_process(COMMAND "jq" "-r" ${json_key}
+                    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+                    OUTPUT_VARIABLE local_result
+                    INPUT_FILE "${CMAKE_SOURCE_DIR}/../project.json")
+    string(STRIP ${local_result} local_result)
+    set(${result} ${local_result} PARENT_SCOPE)
+endfunction()
+
+
 # TODO: get project name from project root folder
 # and convert to lower case for package name:
 project(releasetools)
@@ -27,7 +37,8 @@ set(CPACK_PACKAGE_DESCRIPTION_FILE      "${PROJECT_ROOT}/deploy/PackageDescripti
 
 set(CPACK_INSTALL_CMAKE_PROJECTS        "${CMAKE_CURRENT_BINARY_DIR};${PROJECT_NAME};ALL;/")
 set(CPACK_OUTPUT_CONFIG_FILE            "${CMAKE_CURRENT_BINARY_DIR}/CPack${PROJECT_NAME}Config.cmake")
-set(CPACK_OUTPUT_FILE_PREFIX            "${CMAKE_BINARY_DIR}/../artifacts")
+get_project_setting(".Artifacts.packages" RELATIVE_PACKAGES_FOLDER)
+set(CPACK_OUTPUT_FILE_PREFIX            "${CMAKE_SOURCE_DIR}/../${RELATIVE_PACKAGES_FOLDER}")
 
 set(CPACK_DEBIAN_PACKAGE_DEPENDS        "git-flow, realpath")
 set(CPACK_DEBIAN_PACKAGE_SECTION        "non-free/devel")
