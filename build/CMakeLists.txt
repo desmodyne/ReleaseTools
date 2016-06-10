@@ -28,7 +28,7 @@ set(CPACK_GENERATOR                     "DEB")
 set(CPACK_PACKAGE_NAME                  ${PROJECT_NAME})
 set(CPACK_PACKAGE_VERSION_MAJOR         "0")
 set(CPACK_PACKAGE_VERSION_MINOR         "1")
-set(CPACK_PACKAGE_VERSION_PATCH         "0")
+set(CPACK_PACKAGE_VERSION_PATCH         "1")
 
 set(CPACK_PACKAGE_FILE_NAME             "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY   "DesmoDyne ReleaseTools")
@@ -40,7 +40,8 @@ set(CPACK_OUTPUT_CONFIG_FILE            "${CMAKE_CURRENT_BINARY_DIR}/CPack${PROJ
 get_project_setting(".Artifacts.packages" RELATIVE_PACKAGES_FOLDER)
 set(CPACK_OUTPUT_FILE_PREFIX            "${CMAKE_SOURCE_DIR}/../${RELATIVE_PACKAGES_FOLDER}")
 
-set(CPACK_DEBIAN_PACKAGE_DEPENDS        "git-flow, realpath")
+# TODO: this depends on git-flow, but there is no such package on Ubuntu 11.04; re-add dependency
+set(CPACK_DEBIAN_PACKAGE_DEPENDS        "realpath")
 set(CPACK_DEBIAN_PACKAGE_SECTION        "non-free/devel")
 
 install(DIRECTORY ${PROJECT_ROOT}/data/mirror/ DESTINATION / USE_SOURCE_PERMISSIONS)
