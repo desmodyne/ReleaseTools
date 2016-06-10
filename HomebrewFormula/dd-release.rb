@@ -25,7 +25,7 @@ class TtRelease < Formula
   def install
     # ENV.deparallelize  # if your formula fails when building in parallel
 
-    system "cmake", "./dd-release/build/", *std_cmake_args
+    system "cmake", "./build/", *std_cmake_args
     system "make", "install"
   end
 
