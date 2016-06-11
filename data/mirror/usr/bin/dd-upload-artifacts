@@ -77,7 +77,7 @@ fi
 # on OS X, use grealpath: http://apple.stackexchange.com/a/88812
 repo_root="$(realpath "$1")"
 
-# aboslute path to target project configuration
+# absolute path to target project configuration
 project_conf="${repo_root}/project.json"
 
 # these assume packages being uploaded were built on this host
@@ -88,14 +88,14 @@ project_conf="${repo_root}/project.json"
 distribution=$(lsb_release --id --short | tr '[:upper:]' '[:lower:]')
 
 # determine architecture to determine distribution bitness (e.g. i386, amd64)
-architecture=$(arch)
+arch=$(arch)
 
-if   [[ "${architecture}" == 'i686' ]]
+if   [[ "${arch}" == 'i686' ]]
     then distribution_folder='binary-i386'
-elif [[ "${architecture}" == 'x86_64' ]]
+elif [[ "${arch}" == 'x86_64' ]]
     then distribution_folder='binary-amd64'
 else
-    echo "Unsupported architecture ${architecture}"
+    echo "Unsupported architecture ${arch}"
     exit -1
 fi
 
