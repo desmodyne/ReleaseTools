@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+
+# dd-upload
+#
+# upload artifacts and update package server
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-06-11
+
+
+# -----------------------------------------------------------------------------
+# process command line arguments
+
+if [ $# -ne 1 ]
+then
+    echo "Usage: $(basename "$0") <repository root folder>"
+    exit -1
+else
+    if [ ! -e "$1" ]
+    then
+        echo "$1: No such file or directory"
+        exit -1
+    fi
+    if [ ! -d "$1" ]
+    then
+        echo "$1: Not a directory"
+        exit -1
+    fi
+fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to the root folder of the repository to process
+repo_root="$(realpath "$1")"
+
+
+# -----------------------------------------------------------------------------
+# call the other scripts in the designated order
+
+# TODO: this assumes the script is called from the folder it is located in
+# TODO: this must not be done mindlessly, but only after (manual) test
+# and approval, so there should at least be a warning when this is run
+
+
+./dd-upload-artifacts "${repo_root}"
+res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+echo
+
+./dd-update-package-server "${repo_root}"
+res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+echo
