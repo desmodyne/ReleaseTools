@@ -86,8 +86,13 @@ project_conf="${repo_root}/project.json"
 # get name of target project from configuration
 project_name="$(jq -r '.Project' "${project_conf}")"
 
-# package 'base' name is project name in lower case
+# for single-package projects, package name is project name in lower case;
+# for multi-package projects, package names are determined further below
 package_name="$(echo "${project_name}" | tr '[:upper:]' '[:lower:]')"
+
+# if there is a folder with this name in the repo root,
+# the project is considered a multi-package project
+packages_folder_name='packages'
 
 # path to temporary working folder, relative to target project root
 working_folder="../Temp/${root_folder_name}/${script_name}"
@@ -133,14 +138,15 @@ cmake -D skip-cfgserver=TRUE -D skip-nmeator=TRUE \
 
 make -j5
 
-# TODO: distinguish single vs. multi-package projects
-
-if [[ "${project_name}" == 'ChronicServer' ]]
+if [[ -d "${${repo_root}}/${packages_folder_name}" ]]
 then
     # this works with ChronicServer
-    for package_path in $(find "${repo_root}/packages" -maxdepth 1 -mindepth 1 -type d | sort)
+    for package_path in $(find "${${repo_root}}/${packages_folder_name}" \
+                            -maxdepth 1 -mindepth 1 -type d | sort)
     do
         package_name=$(basename "${package_path}")
+        # TODO: this prevents a cmake message;
+        # get packages to skip from elsewhere
         if [ "${package_name}" == 'cfgserver' ] || [ "${package_name}" == 'nmeator' ]
         then
             continue
