@@ -13,6 +13,6 @@
 
   "Artifacts" :
   {
-    "packages" : "../Temp/ReleaseTools/artifacts"
+    "packages" : "tmp/artifacts"
   }
 }

@@ -94,11 +94,18 @@ package_name="$(echo "${project_name}" | tr '[:upper:]' '[:lower:]')"
 # the project is considered a multi-package project
 packages_folder_name='packages'
 
+# TODO: for a proper out-of-tree build, any files created as part of the build
+# should be located in e.g. ${repo_root}/../Temp; unfortunately, Jenkins fails
+# to support that, so need to use ${repo_root}/tmp instead - disappointing! :-(
+
 # path to temporary working folder, relative to target project root
-working_folder="../Temp/${root_folder_name}/${script_name}"
+# TODO: this 'tmp' should stay in sync with 'tmp/artifacts' setting
+# for 'Artifacts.packages' from project.json configuration file
+working_folder="tmp/${script_name}"
 
 # path from working folder back to target project root
-path_from_working_folder_to_project_root="../../../${root_folder_name}"
+# TODO: this obviously depends on ${working_folder} on should be calculated
+path_from_working_folder_to_project_root="../.."
 
 
 # -----------------------------------------------------------------------------
@@ -138,10 +145,10 @@ cmake -D skip-cfgserver=TRUE -D skip-nmeator=TRUE \
 
 make -j5
 
-if [[ -d "${${repo_root}}/${packages_folder_name}" ]]
+if [[ -d "${repo_root}/${packages_folder_name}" ]]
 then
     # this works with ChronicServer
-    for package_path in $(find "${${repo_root}}/${packages_folder_name}" \
+    for package_path in $(find "${repo_root}/${packages_folder_name}" \
                             -maxdepth 1 -mindepth 1 -type d | sort)
     do
         package_name=$(basename "${package_path}")
