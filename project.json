@@ -13,6 +13,6 @@
 
   "Artifacts" :
   {
-    "packages" : "tmp/artifacts"
+    "packages" : "tmp/artifacts/packages"
   }
 }
