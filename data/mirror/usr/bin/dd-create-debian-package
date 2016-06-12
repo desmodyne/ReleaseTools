@@ -76,17 +76,24 @@ script_name="$(basename "$0")"
 # on OS X, use grealpath: http://apple.stackexchange.com/a/88812
 repo_root="$(realpath "$1")"
 
-# get name of target project from repository root
-project_name="$(basename "${repo_root}")"
+# name of the root folder of the repository to process; usually corresponds
+# to project name during development, but is arbitrary on CI build slave
+root_folder_name="$(basename "${repo_root}")"
+
+# absolute path to target project configuration
+project_conf="${repo_root}/project.json"
+
+# get name of target project from configuration
+project_name="$(jq -r '.Project' "${project_conf}")"
 
 # package 'base' name is project name in lower case
 package_name="$(echo "${project_name}" | tr '[:upper:]' '[:lower:]')"
 
 # path to temporary working folder, relative to target project root
-working_folder="../Temp/${project_name}/${script_name}"
+working_folder="../Temp/${root_folder_name}/${script_name}"
 
 # path from working folder back to target project root
-path_from_working_folder_to_project_root="../../../${project_name}"
+path_from_working_folder_to_project_root="../../../${root_folder_name}"
 
 
 # -----------------------------------------------------------------------------
