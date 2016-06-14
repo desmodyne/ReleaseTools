@@ -36,19 +36,52 @@ fi
 # absolute path to the root folder of the repository to process
 repo_root="$(realpath "$1")"
 
+# list of tools called by this script
+req_tools='dd-upload-artifacts dd-update-package-server'
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+
+# -----------------------------------------------------------------------------
+# determine path to other ReleaseTools scripts
+
+# In production, all ReleaseTools scripts are installed  using a distribution
+# package and any (ReleaseTools or other, e.g. Linux system) tools are found
+# in PATH; during development, this is not necessarily the case: Test if all
+# tools are found and if one is missing, append the path this script resides in
+# to PATH and retry. This does not mix package / production and development
+# versions, either all ReleaseTools scripts are taken from PATH or from local.
+
+for req_tool in ${req_tools}
+do
+    if [ -z "$(which ${req_tool})" ]
+    then
+        echo "${req_tool}: No such file or directory; amend PATH and retry"
+        PATH="${path_to_this_script}:${PATH}"
+
+        for req_tool in ${req_tools}
+        do
+            if [ -z "$(which ${req_tool})" ]
+            then
+                echo "${req_tool}: No such file or directory"
+                exit -1
+            fi
+        done
+    fi
+done
+
 
 # -----------------------------------------------------------------------------
 # call the other scripts in the designated order
 
-# TODO: this assumes the script is called from the folder it is located in
 # TODO: this must not be done mindlessly, but only after (manual) test
 # and approval, so there should at least be a warning when this is run
 
-
-./dd-upload-artifacts "${repo_root}"
+dd-upload-artifacts "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 echo
 
-./dd-update-package-server "${repo_root}"
+dd-update-package-server "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 echo

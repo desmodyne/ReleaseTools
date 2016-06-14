@@ -36,15 +36,50 @@ fi
 # absolute path to the root folder of the repository to process
 repo_root="$(realpath "$1")"
 
+# list of tools called by this script
+req_tools='dd-start-release dd-bump-patch-version '
+req_tools+='dd-create-release-notes dd-push-release-branch'
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+
+# -----------------------------------------------------------------------------
+# determine path to other ReleaseTools scripts
+
+# In production, all ReleaseTools scripts are installed  using a distribution
+# package and any (ReleaseTools or other, e.g. Linux system) tools are found
+# in PATH; during development, this is not necessarily the case: Test if all
+# tools are found and if one is missing, append the path this script resides in
+# to PATH and retry. This does not mix package / production and development
+# versions, either all ReleaseTools scripts are taken from PATH or from local.
+
+for req_tool in ${req_tools}
+do
+    if [ -z "$(which ${req_tool})" ]
+    then
+        echo "${req_tool}: No such file or directory; amend PATH and retry"
+        PATH="${path_to_this_script}:${PATH}"
+
+        for req_tool in ${req_tools}
+        do
+            if [ -z "$(which ${req_tool})" ]
+            then
+                echo "${req_tool}: No such file or directory"
+                exit -1
+            fi
+        done
+    fi
+done
+
 
 # -----------------------------------------------------------------------------
 # call the other scripts in the designated order
 
 # TODO: review error handling (use trap with error function ?)
-# TODO: this assumes the script is called from the folder it is located in
 
 echo
-./dd-start-release "${repo_root}"
+dd-start-release "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 echo
 
@@ -58,15 +93,15 @@ then
     echo "${message}"
     echo
 else
-    ./dd-bump-patch-version "${repo_root}"
+    dd-bump-patch-version "${repo_root}"
     res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
     echo
 fi
 
-./dd-create-release-notes "${repo_root}"
+dd-create-release-notes "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 echo
 
-./dd-push-release-branch "${repo_root}"
+dd-push-release-branch "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 echo
