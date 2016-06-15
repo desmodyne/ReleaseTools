@@ -103,8 +103,8 @@ fi
 # https://www.debian.org/doc/debian-policy/ch-archive.html
 archive_area='non-free'
 
-# determine git branch to determine distribution channel
-git_branch=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
+# determine git branch or target project to determine distribution channel
+git_branch=$(git -C "${repo_root}" rev-parse --symbolic-full-name --abbrev-ref HEAD)
 
 if [[ "${git_branch}" != 'develop' &&
       "${git_branch}" !=  feature* &&
