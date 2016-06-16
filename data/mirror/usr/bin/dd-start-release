@@ -56,12 +56,37 @@ fi
 # absolute path to the root folder of the repository to process
 repo_root="$(realpath "$1")"
 
+# name of default git repo remote
+default_remote_name='origin'
+
+# name of branch for next release development;
+# 'develop' as per git flow convention
+develop_branch='develop'
+
+# regular expression to match branch name for
+# next release development in 'git branch' output
+local_develop_regex="^[ |*] ${develop_branch}$"
+
+# same as above, but for remote branches
+remote_develop_regex="^  ${default_remote_name}/${develop_branch}$"
+
+# name of branch for production releases;
+# 'master' as per git flow convention
+master_branch='master'
+
+# regular expression to match branch name for
+# production releases in 'git branch' output
+local_master_regex="^[ |*] ${master_branch}$"
+
+# same as above, but for remote branches
+remote_master_regex="^  ${default_remote_name}/${master_branch}$"
+
 # name of the release, follows YYYY.CW pattern; as a release is created to
 # publish the efforts of the past week, the calender week is that of last week
 release_name="$(date +"%Y").$(( $(date +"%V") - 1))"
 
 # one error message that might occur and should be dealt with
-err_msg='fatal: Not a gitflow-enabled repo yet. Please run "git flow init" first.'
+err_msg="Fatal: Not a gitflow-enabled repo yet. Please run 'git flow init' first."
 
 
 # NOTE: pushd / popd require bash
@@ -82,17 +107,117 @@ if [ "${res}" -eq 0 ]
 then
     echo "${output}"
 else
-    if [ "${output}" = "${err_msg}" ]
+    if [ "${output}" != "${err_msg}" ]
     then
-        echo 'Not a gitflow-enabled repo yet; run "git flow init" with defaults:'
-        # -d : use default branch names
-        git flow init -d
-        res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
-    else
         # git flow release start prints its own error messages
         echo "${output}"
         popd > /dev/null
         exit "${res}"
+    else
+        # NOTE: git flow init requires local develop and master branches to be
+        # present locally to auto-select them for fully unattended execution
+
+        # TODO: the above does not seem to be the case for a brand new repo:
+        # ssc@vm-build-debian-stable-ssc:~$ cd /tmp
+        # ssc@vm-build-debian-stable-ssc:/tmp$ mkdir test
+        # ssc@vm-build-debian-stable-ssc:/tmp$ cd test
+        # ssc@vm-build-debian-stable-ssc:/tmp/test$ git init
+        # Initialized empty Git repository in /tmp/test/.git/
+        # ssc@vm-build-debian-stable-ssc:/tmp/test$ git flow init -d
+        # Using default branch names.
+        # No branches exist yet. Base branches must be created now.
+        # Branch name for production releases: [master]
+        # Branch name for "next release" development: [develop]
+        #
+        # How to name your supporting branch prefixes?
+        # Feature branches? [feature/]
+        # Release branches? [release/]
+        # Hotfix branches? [hotfix/]
+        # Support branches? [support/]
+        # Version tag prefix? []
+        # Hooks and filters directory? [/tmp/test/.git/hooks]
+
+        echo "Not a gitflow-enabled repo yet, need to run 'git flow init'."
+        echo "Verify preconditions for unattended 'git flow init' execution:"
+        echo
+
+        local_branches="$(git branch)"
+
+        # TODO: remove this
+        # printf "local_branches:\n%s\n" "${local_branches}"
+
+        # NOTE: bash regex doesn't seem to support matching
+        # line ends within a multi-line search string:
+        # if [[ "${local_branches}" =~ "${local_master_regex}" ]]
+
+        echo -n "Production release branch (${master_branch}): "
+
+        # https://github.com/koalaman/shellcheck/wiki/SC2143
+        if echo "${local_branches}" | grep -q "${local_master_regex}"
+        then
+            echo 'OK'
+        else
+            echo 'not found'
+            echo 'Attempt to check it out from default remote:'
+            remote_branches="$(git branch -r)"
+
+            # TODO: remove this
+            # printf "remote_branches:\n%s\n" "${remote_branches}"
+            # echo "remote_master_regex: ${remote_master_regex}"
+
+            # need to test if remote branch exists first in order not to create
+            # a new independent branch or get into a  'detached HEAD' state
+            if echo "${remote_branches}" | grep -q "${remote_master_regex}"
+            then
+                echo "git checkout ${master_branch}"
+                git checkout "${master_branch}"
+                res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+                echo
+            else
+                echo "Failed to obtain ${master_branch} from ${default_remote_name}"
+                exit -1
+            fi
+        fi
+
+        echo -n "Next release development branch (${develop_branch}): "
+
+        if echo "${local_branches}" | grep -q "${local_develop_regex}"
+        then
+            echo 'OK'
+            echo
+        else
+            echo 'not found'
+            echo 'Attempt to check it out from default remote:'
+            remote_branches="$(git branch -r)"
+
+            # TODO: remove this
+            # printf "remote_branches:\n%s\n" "${remote_branches}"
+            # echo "remote_develop_regex: ${remote_develop_regex}"
+
+            # need to test if remote branch exists first in order not to create
+            # a new independent branch or get into a  'detached HEAD' state
+            if echo "${remote_branches}" | grep -q "${remote_develop_regex}"
+            then
+                echo "git checkout ${develop_branch}"
+                git checkout "${develop_branch}"
+                res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+                echo
+            else
+                echo "Failed to obtain ${develop_branch} from ${default_remote_name}"
+                exit -1
+            fi
+        fi
+
+        echo "Preconditions verified; run 'git flow init':"
+
+        # -d : use default branch names
+        git flow init -d
+        res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+
+        echo "Again, start release ${release_name} in ${repo_root}:"
+
+        git flow release start "${release_name}"
+        res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
     fi
 fi
 
