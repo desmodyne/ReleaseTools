@@ -79,6 +79,8 @@ done
 # TODO: this must not be done mindlessly, but only after (manual) test
 # and approval, so there should at least be a warning when this is run
 
+echo
+
 dd-verify-user-configuration "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 echo

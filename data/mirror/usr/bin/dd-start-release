@@ -214,6 +214,7 @@ else
         git flow init -d
         res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 
+        echo
         echo "Again, start release ${release_name} in ${repo_root}:"
 
         git flow release start "${release_name}"

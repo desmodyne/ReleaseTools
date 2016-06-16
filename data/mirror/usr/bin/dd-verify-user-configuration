@@ -51,6 +51,14 @@ at it, you also might want to set your password to be cached for 24 hours:
     git config --global credential.helper "cache --timeout=86400"
 EOT
 
+# map username to real name and email address
+declare -A user_details
+
+# NOTE: bash fails to support this: cannot assign list to array member
+# user_details["bob.the.builder"]=("Bob the Builder" "bob.the.builder@desmodyne.com")
+
+user_details["bob.the.builder"]='Bob the Builder:bob.the.builder@desmodyne.com'
+
 
 # NOTE: pushd / popd require bash
 pushd "${repo_root}" > /dev/null
@@ -59,13 +67,39 @@ pushd "${repo_root}" > /dev/null
 # -----------------------------------------------------------------------------
 # verify user configuration
 
-if [ -z "$(git config user.name)" ] || [ -z "$(git config user.email)" ]
-then
+echo -n "Verify user configuration: "
 
-    echo "${error_message}"
-    echo
-    popd > /dev/null
-    exit -1
+if [ ! -z "$(git config user.name)" ] && [ ! -z "$(git config user.email)" ]
+then
+    echo 'OK'
+else
+    echo 'incomplete'
+    
+    current_username="$(id -u -n)"
+
+    # set details for known users automatically
+    current_user_details="${user_details[${current_username}]}"
+
+    if [ -z "${current_user_details}" ]
+    then
+        echo "${error_message}"
+        echo
+        popd > /dev/null
+        exit -1
+    else
+        username="$(echo "${current_user_details}" | cut -d : -f 1)"
+        email="$(   echo "${current_user_details}" | cut -d : -f 2)"
+
+        echo "Configure settings for known user ${current_username} automatically:"
+
+        echo "git config user.name ${username}"
+        git config user.name "${username}"
+        res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+
+        echo "git config user.email ${email}"
+        git config user.email "${email}"
+        res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+    fi
 fi
 
 
