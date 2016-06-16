@@ -37,8 +37,9 @@ fi
 repo_root="$(realpath "$1")"
 
 # list of tools called by this script
-req_tools='dd-start-release dd-bump-patch-version '
-req_tools+='dd-create-release-notes dd-push-release-branch'
+req_tools='dd-verify-user-configuration dd-start-release '
+req_tools+='dd-bump-patch-version dd-create-release-notes '
+req_tools+='dd-push-release-branch'
 
 # absolute path to this script: http://stackoverflow.com/a/9107028
 path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -79,6 +80,11 @@ done
 # TODO: review error handling (use trap with error function ?)
 
 echo
+
+dd-verify-user-configuration "${repo_root}"
+res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+echo
+
 dd-start-release "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 echo

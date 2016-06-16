@@ -37,7 +37,8 @@ fi
 repo_root="$(realpath "$1")"
 
 # list of tools called by this script
-req_tools='dd-finish-release dd-push-finished-release'
+req_tools='dd-verify-user-configuration dd-finish-release '
+req_tools+='dd-push-finished-release'
 
 # absolute path to this script: http://stackoverflow.com/a/9107028
 path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -78,6 +79,10 @@ done
 # TODO: review error handling (use trap with error function ?)
 # TODO: this must not be done mindlessly, but only after (manual) test
 # and approval, so there should at least be a warning when this is run
+
+dd-verify-user-configuration "${repo_root}"
+res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+echo
 
 dd-finish-release "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
