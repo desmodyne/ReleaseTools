@@ -47,9 +47,6 @@ develop_branch='develop'
 # master branch; 'master' as per git flow convention
 master_branch='master'
 
-# release branch prefix; 'release' as per git flow convention
-rel_prefix='release'
-
 # name of the release, follows YYYY.CW pattern; as a release is created to
 # publish the efforts of the past week, the calender week is that of last week
 release_name="$(date +"%Y").$(( $(date +"%V") - 1))"

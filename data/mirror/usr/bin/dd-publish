@@ -55,14 +55,14 @@ path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 for req_tool in ${req_tools}
 do
-    if [ -z "$(which ${req_tool})" ]
+    if [ -z "$(which "${req_tool}")" ]
     then
         echo "${req_tool}: No such file or directory; amending PATH and retry"
         PATH="${path_to_this_script}:${PATH}"
 
         for req_tool in ${req_tools}
         do
-            if [ -z "$(which ${req_tool})" ]
+            if [ -z "$(which "${req_tool}")" ]
             then
                 echo "${req_tool}: No such file or directory"
                 exit -1

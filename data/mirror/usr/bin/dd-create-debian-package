@@ -76,10 +76,6 @@ script_name="$(basename "$0")"
 # on OS X, use grealpath: http://apple.stackexchange.com/a/88812
 repo_root="$(realpath "$1")"
 
-# name of the root folder of the repository to process; usually corresponds
-# to project name during development, but is arbitrary on CI build slave
-root_folder_name="$(basename "${repo_root}")"
-
 # absolute path to target project configuration
 project_conf="${repo_root}/project.json"
 

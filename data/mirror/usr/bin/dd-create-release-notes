@@ -164,7 +164,7 @@ output_filename="${output_filename//<release name>/${current_branch}}"
 # TODO: make order and format configurable ?
 
 git rev-list --topo-order --format=fuller \
-   "${prev_release}".."${this_release}"   \
+   "${prev_release}..${this_release}"   \
  > "${output_folder}/${output_filename}"
  res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 
