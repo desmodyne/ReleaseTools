@@ -152,21 +152,24 @@ then
     distribution_channel='release'
 fi
 
-# user with write privileges on distribution channels
+# mapping of distribution channel to name
+# and SSH key of user with write privileges
 # NOTE: shellcheck doesn't seem to cope well with alternate notation
-# declare -A channel_privileges= ... -  SC1007, SC2034 plus
+# declare -A channel_2_user_map= ... -  SC1007, SC2034 plus
 # ^-- SC1070: Parsing stopped here because of parsing errors.
 # ^-- SC1036: '(' is invalid here. Did you forget to escape it?
 
-declare -A channel_privileges
+declare -A channel_2_user_map
 
-channel_privileges["develop"]="desmodyne"
-channel_privileges["feature"]="desmodyne"
-channel_privileges["master"]="bob.the.builder"
-channel_privileges["release"]="bob.the.builder"
+channel_2_user_map["develop"]="bob.the.builder:id_rsa_bob.the.builder"
+channel_2_user_map["feature"]="dd:id_rsa_desmodyne"
+channel_2_user_map["master"]="bob.the.builder:id_rsa_bob.the.builder"
+channel_2_user_map["release"]="bob.the.builder:id_rsa_bob.the.builder"
+
+user_info="${channel_2_user_map[${distribution_channel}]}"
 
 # full path to and name of SSH private key file used to log into remote server
-ssh_key="$HOME/.ssh/id_rsa_${channel_privileges[${distribution_channel}]}"
+ssh_key="$HOME/.ssh/$(echo "${user_info}" | cut -d : -f 2)"
 
 # list of currently supported artifacts types
 # TODO: this should probably come from somewhere global
@@ -177,7 +180,7 @@ supported_artifacts_types='configuration downloads packages'
 remote_server='update'
 
 # name of the user to log in as on the remote server
-remote_user="${channel_privileges[${distribution_channel}]}"
+remote_user="$(echo "${user_info}" | cut -d : -f 1)"
 
 # template for first part of remote folder location; defined by us
 remote_loc_tmpl='/var/www/desmodyne.com/%s/public_html/protected'
