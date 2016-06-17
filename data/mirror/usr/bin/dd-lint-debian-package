@@ -99,7 +99,6 @@ packages_folder="$(realpath "${packages_folder}")"
 # TODO: review path and glob
 for package_filename in "${packages_folder}"/*.deb
 do
-    echo
     echo "lintian ${package_filename}:"
     lintian "${package_filename}"
 done
