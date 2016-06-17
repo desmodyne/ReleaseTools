@@ -81,10 +81,6 @@ done
 
 echo
 
-dd-verify-user-configuration "${repo_root}"
-res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
-echo
-
 dd-upload-artifacts "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 echo
