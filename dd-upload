@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+# dd-upload
+#
+# upload artifacts of this project
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-06-16
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# TODO: verify required executables are available before using them
+
+
+# -----------------------------------------------------------------------------
+# upload this project
+
+dd-upload "${path_to_this_script}"
+res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
