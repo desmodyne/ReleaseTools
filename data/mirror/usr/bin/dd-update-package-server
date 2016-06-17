@@ -68,7 +68,7 @@ fi
 # absolute path to the root folder of the repository to process
 # on Debian, install realpath using e.g. aptitude install realpath
 # on OS X, use grealpath: http://apple.stackexchange.com/a/88812
-# repo_root="$(realpath "$1")"
+repo_root="$(realpath "$1")"
 
 # absolute path to GPG key passphrase file
 passphrase_file="${HOME}/.secrets/package_server_passphrase"
@@ -99,7 +99,7 @@ else
 fi
 
 # determine git branch to determine distribution channel
-git_branch=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
+git_branch=$(git -C "${repo_root}" rev-parse --symbolic-full-name --abbrev-ref HEAD)
 
 if [[ "${git_branch}" != 'develop' && \
       "${git_branch}" !=  feature* && \
