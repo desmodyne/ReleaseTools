@@ -13,6 +13,10 @@
 # https://en.wikipedia.org/wiki/Software_versioning
 
 
+echo
+echo 'dd-bump-patch-version:'
+echo
+
 # -----------------------------------------------------------------------------
 # determine platform: http://stackoverflow.com/a/18434831
 
@@ -204,3 +208,8 @@ fi
 
 
 popd > /dev/null
+
+
+echo
+echo 'dd-bump-patch-version: success'
+echo

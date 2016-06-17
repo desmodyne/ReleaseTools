@@ -9,6 +9,10 @@
 # created : 2016-06-02
 
 
+echo
+echo 'dd-upload-artifacts:'
+echo
+
 # -----------------------------------------------------------------------------
 # determine platform: http://stackoverflow.com/a/18434831
 
@@ -334,5 +338,9 @@ do
     echo "rsync ${rsync_switches} ${local_folder}/ ${remote_location}"
     # shellcheck disable=SC2086
     rsync ${rsync_switches} "${local_folder}/" "${remote_location}"
-    echo
 done
+
+
+echo
+echo 'dd-upload-artifacts: success'
+echo

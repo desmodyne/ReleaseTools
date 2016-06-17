@@ -9,6 +9,10 @@
 # created : 2016-06-11
 
 
+echo
+echo 'dd-update-package-server:'
+echo
+
 # -----------------------------------------------------------------------------
 # determine platform: http://stackoverflow.com/a/18434831
 
@@ -151,3 +155,8 @@ ssh_cmd_line="dd-update-release-signature ${distribution} " \
 ssh_cmd_line+="${architecture} ${distribution_channel}"
 # shellcheck disable=SC2029
 ssh "${remote_user}@${remote_server}" "${ssh_cmd_line}" < "${passphrase_file}"
+
+
+echo
+echo 'dd-update-package-server: success'
+echo

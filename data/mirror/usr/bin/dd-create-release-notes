@@ -9,6 +9,10 @@
 # created : 2016-06-03
 
 
+echo
+echo 'dd-create-release-notes:'
+echo
+
 # -----------------------------------------------------------------------------
 # determine platform: http://stackoverflow.com/a/18434831
 
@@ -180,3 +184,8 @@ res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 
 
 popd > /dev/null
+
+
+echo
+echo 'dd-create-release-notes: success'
+echo

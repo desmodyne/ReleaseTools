@@ -9,6 +9,10 @@
 # created : 2016-06-06
 
 
+echo
+echo 'dd-push-finished-release:'
+echo
+
 # -----------------------------------------------------------------------------
 # process command line arguments
 
@@ -139,3 +143,8 @@ fi
 
 
 popd > /dev/null
+
+
+echo
+echo 'dd-push-finished-release: success'
+echo

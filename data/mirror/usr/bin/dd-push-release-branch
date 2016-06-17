@@ -9,6 +9,10 @@
 # created : 2016-06-06
 
 
+echo
+echo 'dd-push-release-branch:'
+echo
+
 # -----------------------------------------------------------------------------
 # process command line arguments
 
@@ -88,3 +92,8 @@ fi
 
 
 popd > /dev/null
+
+
+echo
+echo 'dd-push-release-branch: success'
+echo

@@ -9,6 +9,10 @@
 # created : 2016-06-08
 
 
+echo
+echo 'dd-lint-debian-package:'
+echo
+
 # -----------------------------------------------------------------------------
 # determine platform: http://stackoverflow.com/a/18434831
 
@@ -102,3 +106,8 @@ do
     echo "lintian ${package_filename}:"
     lintian "${package_filename}"
 done
+
+
+echo
+echo 'dd-lint-debian-package: success'
+echo
