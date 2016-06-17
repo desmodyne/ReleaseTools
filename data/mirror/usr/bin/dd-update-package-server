@@ -73,11 +73,6 @@ repo_root="$(realpath "$1")"
 # absolute path to GPG key passphrase file
 passphrase_file="${HOME}/.secrets/package_server_passphrase"
 
-# hostname of remote update server; defined by us
-# NOTE: 'update' server name is defined in DesmoDyne corporate name server
-# NOTE: this assumes access to remote server using SSH key is fully set up
-server_name='update'
-
 # local file with
 # these assume packages being uploaded were built on this host
 # and there is no "cross-package-building" taking place, ie.
@@ -120,6 +115,24 @@ elif [[ "${git_branch}" ==   release* ]]
     then distribution_channel='release'
 fi
 
+# user with write privileges on distribution channels
+declare -A channel_privileges
+
+channel_privileges["develop"]="desmodyne"
+channel_privileges["feature"]="desmodyne"
+channel_privileges["master"]="bob.the.builder"
+channel_privileges["release"]="bob.the.builder"
+
+# name of remote server; defined by us
+# NOTE: 'update' server name is defined in DesmoDyne corporate name server
+remote_server='update'
+
+# name of the user to log in as on the remote server
+remote_user="${channel_privileges[${distribution_channel}]}"
+
+
+# TODO: do these require the same SSH key work as in dd-upload-artifacts ?
+
 
 # -----------------------------------------------------------------------------
 # update package index on distribution server
@@ -127,7 +140,7 @@ fi
 ssh_cmd_line="dd-update-package-index ${distribution} " \
 ssh_cmd_line+="${architecture} ${distribution_channel}"
 # shellcheck disable=SC2029
-ssh "${server_name}" "${ssh_cmd_line}"
+ssh "${remote_user}@${remote_server}" "${ssh_cmd_line}"
 
 # -----------------------------------------------------------------------------
 # update release signature on distribution server
@@ -135,4 +148,4 @@ ssh "${server_name}" "${ssh_cmd_line}"
 ssh_cmd_line="dd-update-release-signature ${distribution} " \
 ssh_cmd_line+="${architecture} ${distribution_channel}"
 # shellcheck disable=SC2029
-ssh "${server_name}" "${ssh_cmd_line}" < "${passphrase_file}"
+ssh "${remote_user}@${remote_server}" "${ssh_cmd_line}" < "${passphrase_file}"
