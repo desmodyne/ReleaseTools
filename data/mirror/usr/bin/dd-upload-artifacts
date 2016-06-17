@@ -150,6 +150,9 @@ channel_privileges["feature"]="desmodyne"
 channel_privileges["master"]="bob.the.builder"
 channel_privileges["release"]="bob.the.builder"
 
+# full path to and name of SSH private key file used to log into update server
+ssh_key="$HOME/.ssh/id_rsa_${channel_privileges[${distribution_channel}]}"
+
 # list of currently supported artifacts types
 # TODO: this should probably come from somewhere global
 supported_artifacts_types='configuration downloads packages'
@@ -180,17 +183,50 @@ rsync_switches='--archive --checksum --verbose'
 # -----------------------------------------------------------------------------
 # get artifacts mapping from target project
 
-# TODO: check if agent is already running; re-use
-
-echo -n 'Require SSH key to upload to remote server. '
-eval "$(ssh-agent -s)" > /dev/null
-ssh-add ~/.ssh/id_rsa_"${channel_privileges[${distribution_channel}]}"
+echo "Repository at ${repo_root} is on git branch ${git_branch},"
+echo "upload to ${distribution_channel} channel"
 echo
 
-message="repository at ${repo_root} is on git branch ${git_branch}, "
-message+="sync to ${distribution_channel} channel:"
+if [ ! -r "${ssh_key}" ]
+then
+    echo "Would use SSH key ${ssh_key} to connect, but failed to find file."
+    exit -1
+fi
 
-echo "${message}"
+echo "Use SSH key ${ssh_key} to connect"
+
+if [ -z "${SSH_AGENT_PID}" ] || [ -z "${SSH_AUTH_SOCK}" ]
+then
+    echo -n "  start new SSH agent: "
+    # TODO: output SSH_AGENT_PID and SSH_AUTH_SOCK of new agent
+    # TODO: mute eval output > /dev/null
+    # ssh-agent -s sample output:
+    #   SSH_AUTH_SOCK=/tmp/ssh-ieIVK1IGVv29/agent.25687; export SSH_AUTH_SOCK;
+    #   SSH_AGENT_PID=25688; export SSH_AGENT_PID;
+    #   echo Agent pid 25688;
+    # eval "$(ssh-agent -s)" sample output:
+    #   Agent pid 25688
+    eval "$(ssh-agent -s)"
+else
+    echo "  re-use SSH agent with PID ${SSH_AGENT_PID} at ${SSH_AUTH_SOCK}"
+fi
+
+# TODO: check key fingerprint instead of key filename
+# ssh-add -l sample output (wrapping indicated by ... ):
+# 4096 36:ab:bc:9f:93:c2:ee:8f:51:0b:b4:a1:46:96:d3:7f ...
+#  ... /home/ssc/.ssh/id_rsa_bob.the.builder (RSA)
+
+current_keys="$(ssh-add -l)"
+
+if [[ " ${current_keys} " =~ " ${ssh_key} " ]]
+then
+    echo "  re-use existing identity represented by SSH agent"
+else
+    # TODO: align ssh-add output with convention
+    echo -n '  no matching identities found: '
+    ssh-add "${ssh_key}"
+fi
+
 echo
 
 artifacts_json="$(jq '.Artifacts' "${project_conf}")"
