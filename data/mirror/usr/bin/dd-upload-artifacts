@@ -31,6 +31,18 @@ case "${OSTYPE}" in
             exit "${res}"
         fi
 
+        # ping return code 2 is too generic to be useful
+        ping_code=2
+
+        # ping error message for recoverable problem;
+        ping_err_msg_tmpl='ping: unknown host %s'
+
+        # NOTE: on OSX, BSD (?) ping is different:
+        # alexa:~ ssc$ ping -c 1 bogushost
+        # ping: cannot resolve bogushost: Unknown host
+        # alexa:~ echo $?
+        # 68
+
         ;;
     *)
         echo "Unsupported operating system: ${OSTYPE}"
@@ -153,20 +165,22 @@ channel_privileges["feature"]="desmodyne"
 channel_privileges["master"]="bob.the.builder"
 channel_privileges["release"]="bob.the.builder"
 
-# full path to and name of SSH private key file used to log into update server
+# full path to and name of SSH private key file used to log into remote server
 ssh_key="$HOME/.ssh/id_rsa_${channel_privileges[${distribution_channel}]}"
 
 # list of currently supported artifacts types
 # TODO: this should probably come from somewhere global
 supported_artifacts_types='configuration downloads packages'
 
-# first part of remote server and folder location; defined by us
+# name of remote server; defined by us
 # NOTE: 'update' server name is defined in DesmoDyne corporate name server
-# NOTE: this assumes access to remote server using SSH key is fully set up
-remote_loc_tmpl='update:/var/www/desmodyne.com/%s/public_html/protected'
+remote_server='update'
 
-# second part of remote server and folder location;
-# defined by Debian standard for packages; defined by us for all other
+# template for first part of remote folder location; defined by us
+remote_loc_tmpl='/var/www/desmodyne.com/%s/public_html/protected'
+
+# second part of remote folder location;
+# defined by Debian standard for packages; defined by us for other artifacts
 declare -A remote_loc_leaves
 
 # configuration is yet to be amended by ship name; downloads isn't used yet
@@ -184,7 +198,31 @@ rsync_switches='--archive --checksum --verbose'
 
 
 # -----------------------------------------------------------------------------
-# get artifacts mapping from target project
+# upload artifacts to remote server
+
+echo -n "Test-ping remote server: "
+ping_output=$(ping -c 1 "${remote_server}" 2>&1)
+
+res="$?"
+
+if [ "${res}" -eq 0 ]
+then
+    echo 'OK'
+else
+    ping_err_msg="$(printf "${ping_err_msg_tmpl}" "${remote_server}")"
+
+    if [ "${res}" -eq "${ping_code}" ] && \
+       [ "${ping_output}" = "${ping_err_msg}" ]
+    then
+        echo "${ping_output}"
+        echo "Maybe add a line '<IP address>  ${remote_server}' to /etc/hosts ?"
+    else
+        echo "unexpected failure:"
+        echo "${ping_output}"
+    fi
+
+    exit -1
+fi
 
 echo "Repository at ${repo_root} is on git branch ${git_branch},"
 echo "upload to ${distribution_channel} channel"
@@ -245,9 +283,6 @@ do
         continue
     fi
 
-    # -------------------------------------------------------------------------
-    # sync local to remote folder
-
     echo "${artifacts_type}:"
     echo
 
@@ -282,8 +317,9 @@ do
         remote_loc_leaf=$(printf "${remote_loc_leaf}" "${ship_name}")
     fi
 
+    remote_loc=$(printf "${remote_loc_tmpl}" "${artifacts_type}")
     # shellcheck disable=SC2059
-    remote_location="$(printf "${remote_loc_tmpl}" "${artifacts_type}")/${remote_loc_leaf}"
+    remote_location="${remote_server}:/${remote_loc}/${remote_loc_leaf}"
 
     printf "sync %s\nto   %s:\n" "${local_folder}" "${remote_location}"
     echo "rsync ${rsync_switches} ${local_folder}/ ${remote_location}"
