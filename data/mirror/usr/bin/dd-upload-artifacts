@@ -77,6 +77,9 @@ fi
 # on OS X, use grealpath: http://apple.stackexchange.com/a/88812
 repo_root="$(realpath "$1")"
 
+# absolute path to target project configuration
+project_conf="${repo_root}/project.json"
+
 # these assume packages being uploaded were built on this host
 # and there is no "cross-package-building" taking place, ie.
 # no creating Debian 32-bit packages on a Ubuntu 64-bit host
