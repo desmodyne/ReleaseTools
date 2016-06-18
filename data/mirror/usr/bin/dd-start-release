@@ -255,9 +255,9 @@ do
                 release_name="${canonical_release_name}.01"
             else
                 # TODO: this strongly relies on 2016.25.01 pattern
-                counter="$(echo "${release_name}" | cut -d . -f 2)"
+                counter="$(echo "${release_name}" | cut -d . -f 3)"
                 counter=$((counter+1))
-                release_name="${canonical_release_name}.${counter}"
+                release_name="${canonical_release_name}.$(printf "%02d" ${counter})"
             fi
 
             echo
