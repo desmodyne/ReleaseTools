@@ -72,9 +72,8 @@ fi
 # absolute path to the root folder of the repository to process
 repo_root="$(realpath "$1")"
 
-# name of the release, follows YYYY.CW pattern; as a release is created to
-# publish the efforts of the past week, the calender week is that of last week
-release_name="$(date +"%Y").$(( $(date +"%V") - 1))"
+# release branch prefix; 'release' as per git flow convention
+rel_prefix='release'
 
 # message for creating release tag
 # TODO: add project and release names ?
@@ -91,6 +90,17 @@ pushd "${repo_root}" > /dev/null
 
 # -----------------------------------------------------------------------------
 # finish the release
+
+# name of the release in progress
+# TODO: this assumes there is only one local release branch at a time - which is
+# reasonable as git flow refuses to start a release if there is already one
+release_name="$(git branch | grep "^[*| ] ${rel_prefix}" | cut -d / -f 2)"
+
+if [ -z "${release_name}" ]
+then
+    echo "Failed to determine name of current release"
+    exit -1
+fi
 
 echo "Finish release ${release_name} in ${repo_root}:"
 

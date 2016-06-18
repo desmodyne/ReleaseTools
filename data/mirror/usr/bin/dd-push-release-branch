@@ -48,10 +48,6 @@ repo_root="$(realpath "$1")"
 # release branch prefix; 'release' as per git flow convention
 rel_prefix='release'
 
-# name of the release, follows YYYY.CW pattern; as a release is created to
-# publish the efforts of the past week, the calender week is that of last week
-release_name="$(date +"%Y").$(( $(date +"%V") - 1))"
-
 
 # NOTE: pushd / popd require bash
 pushd "${repo_root}" > /dev/null
@@ -72,6 +68,17 @@ pushd "${repo_root}" > /dev/null
 #       git remote add <name> <url>
 #   and then push using the remote name
 #       git push <name>
+
+# name of the release in progress
+# TODO: this assumes there is only one local release branch at a time - which is
+# reasonable as git flow refuses to start a release if there is already one
+release_name="$(git branch | grep "^[*| ] ${rel_prefix}" | cut -d / -f 2)"
+
+if [ -z "${release_name}" ]
+then
+    echo "Failed to determine name of current release"
+    exit -1
+fi
 
 # NOTE: 'git push' alone fails with e.g.
 # fatal: The current branch release/2016.22 has no upstream branch.
