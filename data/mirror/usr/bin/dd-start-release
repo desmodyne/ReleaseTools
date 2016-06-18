@@ -129,6 +129,7 @@ res="$?"
 
 while [ "${res}" -ne 0 ]
 do
+    # shellcheck disable=SC2059
     err_msg_tag_already_exists="$(printf "${err_msg_tag_already_exists_tmpl}" \
                                          "${release_name}")"
 

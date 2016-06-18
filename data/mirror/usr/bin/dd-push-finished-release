@@ -46,7 +46,8 @@ fi
 repo_root="$(realpath "$1")"
 
 # release branch prefix; 'release' as per git flow convention
-rel_prefix='release'
+# TODO: remove this with the inactive branch deletion below
+# rel_prefix='release'
 
 # develop branch; 'develop' as per git flow convention
 develop_branch='develop'

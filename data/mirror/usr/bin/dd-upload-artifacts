@@ -220,6 +220,7 @@ then
     echo 'OK'
     echo
 else
+    # shellcheck disable=SC2059
     ping_err_msg="$(printf "${ping_err_msg_tmpl}" "${remote_server}")"
 
     if [ "${res}" -eq "${ping_code}" ] && \
@@ -271,6 +272,7 @@ fi
 
 current_keys="$(ssh-add -l)"
 
+# shellcheck disable=SC2076
 if [[ " ${current_keys} " =~ " ${ssh_key} " ]]
 then
     echo "  re-use existing identity represented by SSH agent"
