@@ -54,6 +54,9 @@ develop_branch='develop'
 # master branch; 'master' as per git flow convention
 master_branch='master'
 
+# regex pattern for most recent commit message
+message_regex="^Merge tag '(.*)' into develop"
+
 
 # NOTE: pushd / popd require bash
 pushd "${repo_root}" > /dev/null
@@ -78,10 +81,20 @@ pushd "${repo_root}" > /dev/null
 #   and then push using the remote name
 #       git push <name>
 
-# name of the release in progress
-# TODO: this assumes there is only one local release branch at a time - which is
-# reasonable as git flow refuses to start a release if there is already one
-release_name="$(git branch | grep "^[*| ] ${rel_prefix}" | cut -d / -f 2)"
+# name of the release in progress: at this point, the release branch has already
+# been deleted and the best way to determine the name of the release whose
+# changes to push seems to be to look at the most recent git commit message
+
+# http://stackoverflow.com/a/7293026
+# git log -1 --pretty=%B sample output:
+# Merge tag '2016.23.02' into develop
+#
+# automatically_created_release_tag 2016.23.02
+#
+
+release_name="$(git log -1 --pretty=%B            \
+                    | ggrep -E "${message_regex}" \
+                    | gsed -r -e "s|${message_regex}|\1|g")"
 
 if [ -z "${release_name}" ]
 then
