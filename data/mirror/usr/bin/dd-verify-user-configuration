@@ -61,6 +61,7 @@ declare -A user_details
 # NOTE: bash fails to support this: cannot assign list to array member
 # user_details["bob.the.builder"]=("Bob the Builder" "bob.the.builder@desmodyne.com")
 
+# shellcheck disable=SC2154
 user_details["bob.the.builder"]='Bob the Builder:bob.the.builder@desmodyne.com'
 
 

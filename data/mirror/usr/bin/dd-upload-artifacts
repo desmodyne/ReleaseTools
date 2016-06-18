@@ -165,9 +165,13 @@ fi
 
 declare -A channel_2_user_map
 
+# shellcheck disable=SC2154
 channel_2_user_map["develop"]="bob.the.builder:id_rsa_bob.the.builder"
+# shellcheck disable=SC2154
 channel_2_user_map["feature"]="dd:id_rsa_desmodyne"
+# shellcheck disable=SC2154
 channel_2_user_map["master"]="bob.the.builder:id_rsa_bob.the.builder"
+# shellcheck disable=SC2154
 channel_2_user_map["release"]="bob.the.builder:id_rsa_bob.the.builder"
 
 user_info="${channel_2_user_map[${distribution_channel}]}"
