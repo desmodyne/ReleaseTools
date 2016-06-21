@@ -133,6 +133,9 @@ export GIT_MERGE_AUTOEDIT=no
 #  -m essage -- automatically_created_release_tag 2016.21
 # flags:FATAL unable to parse provided options with getopt.
 
+# TODO: investigate and recover from or prepare for
+# master and origin/master having diverged
+
 git flow release finish -m "${tag_message}" "${release_name}"
 res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 
