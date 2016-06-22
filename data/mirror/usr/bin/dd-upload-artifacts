@@ -275,6 +275,16 @@ ssh_key_fingerprint="$(ssh-keygen -lf "${ssh_key}" \
                            | "${sed}" -r -e "s|${regex_fingerprint}|\1|g")"
 echo "  SSH key fingerprint: ${ssh_key_fingerprint}"
 
+# TODO: I am at a loss here - this all works fine on vm-build-debian-stable,
+# but on vm-build-nice, this _does_ finds the ssh agent, but ssh-add -l reports
+# 'The agent has no identities.'; setting SSH_AUTH_SOCK explicitely fixes this.
+# vm-build-nice is anyway on the way out; remove this once it's gone for good.
+
+if [ "$(hostname)" = 'vm-build-nice' ]
+then
+    SSH_AUTH_SOCK='/home/bob.the.builder/.ssh/ssh_auth_sock'
+fi
+
 # TODO: also use ${SSH_AGENT_PID} ?
 if [ -z "${SSH_AUTH_SOCK}" ]
 then
