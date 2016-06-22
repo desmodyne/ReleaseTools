@@ -262,7 +262,7 @@ echo
 
 if [ ! -r "${ssh_key}" ]
 then
-    echo "Would use SSH key ${ssh_key} to connect, but failed to find file."
+    echo "Would use SSH key ${ssh_key} to connect, but couldn't find that file."
     exit -1
 fi
 
@@ -278,16 +278,28 @@ echo "  SSH key fingerprint: ${ssh_key_fingerprint}"
 # TODO: also use ${SSH_AGENT_PID} ?
 if [ -z "${SSH_AUTH_SOCK}" ]
 then
-    echo -n "  start new SSH agent: "
-    # TODO: output SSH_AGENT_PID and SSH_AUTH_SOCK of new agent
-    # TODO: mute eval output > /dev/null
+    # TODO: start ssh agent & add ssh key using passphrase from .secret folder ?
+    # then at least both GPG and SSH agent would be handled in the same way
+    # requires using expect though: http://unix.stackexchange.com/a/90869
+    # TODO: get any secrets as required from Hashicorp Vault password server
+    # TODO: scan for active ssh-agent processes or existing ssh auth socks ?
     # ssh-agent -s sample output:
     #   SSH_AUTH_SOCK=/tmp/ssh-ieIVK1IGVv29/agent.25687; export SSH_AUTH_SOCK;
     #   SSH_AGENT_PID=25688; export SSH_AGENT_PID;
     #   echo Agent pid 25688;
     # eval "$(ssh-agent -s)" sample output:
     #   Agent pid 25688
-    eval "$(ssh-agent -s)"
+    # TODO: after killing all ssh-agents and even after a reboot, this code is
+    # never hit; /home/bob.the.builder/.ssh/ssh_auth_sock is a symlink to
+    # /tmp/ssh-fKVb5d9s4i91/agent.24066, but that socket no longer exists;
+    # the build job succeeds anyway with a message like:
+    #   re-use SSH agent at /tmp/workspace/ ...
+    #     ... TTTest_develop_linux_64_upload_ssc@tmp/ssh7706433244521684880
+
+    message='Failed to contact SSH agent. Please ssh into this machine as user '
+    message+="${remote_user} and run 'ssh-add ${ssh_key}'"
+    echo "${message}"
+    exit -1
 else
     echo "  re-use SSH agent at ${SSH_AUTH_SOCK}"
 fi
