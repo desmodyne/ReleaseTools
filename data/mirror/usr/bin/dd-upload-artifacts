@@ -17,7 +17,23 @@ echo
 # determine platform: http://stackoverflow.com/a/18434831
 
 case "${OSTYPE}" in
+
+    # darwin*)
+    #     grep='ggrep'
+    #     sed='gsed'
+    #
+    #     # NOTE: on OSX, BSD (?) ping is different:
+    #     # alexa:~ ssc$ ping -c 1 bogushost
+    #     # ping: cannot resolve bogushost: Unknown host
+    #     # alexa:~ echo $?
+    #     # 68
+    #
+    #     ;;
+
     linux*)
+        grep='grep'
+        sed='sed'
+
         dist_name=$(lsb_release --id --short)
 
         res="$?"
@@ -41,13 +57,8 @@ case "${OSTYPE}" in
         # ping error message for recoverable problem;
         ping_err_msg_tmpl='ping: unknown host %s'
 
-        # NOTE: on OSX, BSD (?) ping is different:
-        # alexa:~ ssc$ ping -c 1 bogushost
-        # ping: cannot resolve bogushost: Unknown host
-        # alexa:~ echo $?
-        # 68
-
         ;;
+
     *)
         echo "Unsupported operating system: ${OSTYPE}"
         exit -1
@@ -179,6 +190,10 @@ user_info="${channel_2_user_map[${distribution_channel}]}"
 # full path to and name of SSH private key file used to log into remote server
 ssh_key="$HOME/.ssh/$(echo "${user_info}" | cut -d : -f 2)"
 
+# regular expression to match ssh key fingerprint
+# in ssh-add -l and ssh-keygen -lf output
+regex_fingerprint='^[0-9]+ ([a-z0-9:]+) .+$'
+
 # list of currently supported artifacts types
 # TODO: this should probably come from somewhere global
 supported_artifacts_types='configuration downloads packages'
@@ -251,9 +266,17 @@ then
     exit -1
 fi
 
+# TODO: if ssh agent is not running or key passphrase is not cached,
+# abort and print instructions what to do before retrying
+
 echo "Use SSH key ${ssh_key} to connect"
 
-if [ -z "${SSH_AGENT_PID}" ] || [ -z "${SSH_AUTH_SOCK}" ]
+ssh_key_fingerprint="$(ssh-keygen -lf "${ssh_key}" \
+                           | "${sed}" -r -e "s|${regex_fingerprint}|\1|g")"
+echo "  SSH key fingerprint: ${ssh_key_fingerprint}"
+
+# TODO: also use ${SSH_AGENT_PID} ?
+if [ -z "${SSH_AUTH_SOCK}" ]
 then
     echo -n "  start new SSH agent: "
     # TODO: output SSH_AGENT_PID and SSH_AUTH_SOCK of new agent
@@ -266,24 +289,37 @@ then
     #   Agent pid 25688
     eval "$(ssh-agent -s)"
 else
-    echo "  re-use SSH agent with PID ${SSH_AGENT_PID} at ${SSH_AUTH_SOCK}"
+    echo "  re-use SSH agent at ${SSH_AUTH_SOCK}"
 fi
 
-# TODO: check key fingerprint instead of key filename
+# compare ssh key fingerprint against those stored in ssh agent
+
+# http://stackoverflow.com/a/9607373
+# http://stackoverflow.com/a/25465155
+
+# NOTE: there's an annoying difference (.pub) in tool output:
 # ssh-add -l sample output (wrapping indicated by ... ):
 # 4096 36:ab:bc:9f:93:c2:ee:8f:51:0b:b4:a1:46:96:d3:7f ...
-#  ... /home/ssc/.ssh/id_rsa_bob.the.builder (RSA)
+#  ... /home/bob.the.builder/.ssh/id_rsa_bob.the.builder (RSA)
+# ssh-keygen -lf ~/.ssh/id_rsa_bob.the.builder
+# 4096 36:ab:bc:9f:93:c2:ee:8f:51:0b:b4:a1:46:96:d3:7f ...
+#  ... /home/bob.the.builder/.ssh/id_rsa_bob.the.builder.pub (RSA)
+#
+# the difference is larger, but not less annoying, on vm-build-debian-stable:
+# 4096 36:ab:bc:9f:93:c2:ee:8f:51:0b:b4:a1:46:96:d3:7f  ...
+#  ... bob.the.builder (bob.the.builder@desmodyne.com) (RSA)
+# 4096 36:ab:bc:9f:93:c2:ee:8f:51:0b:b4:a1:46:96:d3:7f  ...
+#  ... /home/bob.the.builder/.ssh/id_rsa_bob.the.builder.pub (RSA)
 
 current_keys="$(ssh-add -l)"
 
-# shellcheck disable=SC2076
-if [[ " ${current_keys} " =~ " ${ssh_key} " ]]
+if [ -z "$(echo "${current_keys}" | grep "${ssh_key_fingerprint}")" ]
 then
-    echo "  re-use existing identity represented by SSH agent"
-else
     # TODO: align ssh-add output with convention
     echo -n '  no matching identities found: '
     ssh-add "${ssh_key}"
+else
+    echo "  re-use existing identity represented by SSH agent"
 fi
 
 echo
