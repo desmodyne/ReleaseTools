@@ -131,6 +131,12 @@ then
     exit -1
 fi
 
+# TODO: see dd-upload-artifacts
+if [ "$(hostname)" = 'vm-build-nice' ]
+then
+    SSH_AUTH_SOCK='/home/bob.the.builder/.ssh/ssh_auth_sock'
+fi
+
 echo -n "Finish release ${release_name} in ${repo_root}: "
 
 # http://stackoverflow.com/q/14531243
@@ -139,6 +145,18 @@ echo -n "Finish release ${release_name} in ${repo_root}: "
 # TODO: store value before setting it; restore after use
 export GIT_MERGE_AUTOEDIT=no
 # echo "GIT_MERGE_AUTOEDIT: ${GIT_MERGE_AUTOEDIT}"
+
+# TODO: this occurred while heavily debugging this on vm-build-nice;
+# not sure if it will occur again during regular operations:
+# dd-finish-release:
+#
+# Finish release 2016.24.04 in /tmp/workspace/TTTest_publish_ssc:
+# [: 1: Illegal number: -master
+# Branches 'master' and 'origin/master' have diverged.
+# And local branch 'master' is ahead of 'origin/master'.
+# Branches 'develop' and 'origin/develop' have diverged.
+# And local branch 'develop' is ahead of 'origin/develop'.
+# Fatal: Tag already exists and does not point to release branch 'release/2016.24.04'
 
 # TODO: on OS X, getopt fails if options such as the tag message contain spaces:
 #   flags:FATAL the available getopt does not support spaces in options

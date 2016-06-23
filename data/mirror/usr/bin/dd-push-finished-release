@@ -126,6 +126,12 @@ then
     exit -1
 fi
 
+# TODO: see dd-upload-artifacts
+if [ "$(hostname)" = 'vm-build-nice' ]
+then
+    SSH_AUTH_SOCK='/home/bob.the.builder/.ssh/ssh_auth_sock'
+fi
+
 # NOTE: tag name is equal to release name by git flow convention
 echo "Push release tag ${release_name} to origin:"
 git push origin "${release_name}"

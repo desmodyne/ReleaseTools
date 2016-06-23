@@ -85,6 +85,12 @@ fi
 # To push the current branch and set the remote as upstream, use
 #     git push --set-upstream origin release/2016.22
 
+# TODO: see dd-upload-artifacts
+if [ "$(hostname)" = 'vm-build-nice' ]
+then
+    SSH_AUTH_SOCK='/home/bob.the.builder/.ssh/ssh_auth_sock'
+fi
+
 echo "Push release branch ${rel_prefix}/${release_name} to origin:"
 git push origin --set-upstream "${rel_prefix}/${release_name}"
 
