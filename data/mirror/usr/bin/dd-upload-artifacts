@@ -31,6 +31,7 @@ case "${OSTYPE}" in
     #     ;;
 
     linux*)
+        # shellcheck disable=SC2034
         grep='grep'
         sed='sed'
 
@@ -335,13 +336,15 @@ fi
 
 current_keys="$(ssh-add -l)"
 
-if [ -z "$(echo "${current_keys}" | grep "${ssh_key_fingerprint}")" ]
+# TODO: review this
+# https://github.com/koalaman/shellcheck/wiki/SC2143
+if echo "${current_keys}" | grep -q "${ssh_key_fingerprint}"
 then
-    # TODO: align ssh-add output with convention
-    echo -n '  no matching identities found: '
-    ssh-add "${ssh_key}"
-else
     echo "  re-use existing identity represented by SSH agent"
+else
+  # TODO: align ssh-add output with convention
+  echo -n '  no matching identities found: '
+  ssh-add "${ssh_key}"
 fi
 
 echo

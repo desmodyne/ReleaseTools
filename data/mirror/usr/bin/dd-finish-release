@@ -134,6 +134,7 @@ fi
 # TODO: see dd-upload-artifacts
 if [ "$(hostname)" = 'vm-build-nice' ]
 then
+    # shellcheck disable=SC2034
     SSH_AUTH_SOCK='/home/bob.the.builder/.ssh/ssh_auth_sock'
 fi
 
