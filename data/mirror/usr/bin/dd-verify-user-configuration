@@ -97,8 +97,8 @@ else
 
         echo "Configure settings for known user ${current_username} automatically:"
 
-        echo "git config user.name ${username}"
-        git config user.name "${username}"
+        echo "git config user.name \"${username}\""
+        git config user.name "\"${username}\""
         res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 
         echo "git config user.email ${email}"
