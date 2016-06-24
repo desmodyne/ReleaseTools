@@ -260,7 +260,10 @@ do
             else
                 # TODO: this strongly relies on 2016.25.01 pattern
                 counter="$(echo "${release_name}" | cut -d . -f 3)"
-                counter=$((counter+1))
+                # http://stackoverflow.com/a/24777667
+                # http://stackoverflow.com/a/21050240
+                # http://stackoverflow.com/a/12821845
+                counter=$((10#$counter + 1))
                 release_name="${canonical_release_name}.$(printf "%02d" ${counter})"
             fi
 
