@@ -23,7 +23,13 @@ class TtRelease < Formula
   depends_on "bash"
   
   def install
-    system "cmake", "./build/", *std_cmake_args
-    system "make", "install"
+    bin.install "./data/mirror/usr/bin/dd-publish"
+    bin.install "./data/mirror/usr/bin/dd-bump-patch-version"
+    bin.install "./data/mirror/usr/bin/dd-finish-release"
+    bin.install "./data/mirror/usr/bin/dd-push-finished-release"
+    bin.install "./data/mirror/usr/bin/dd-release"
+    bin.install "./data/mirror/usr/bin/dd-create-release-notes"
+    bin.install "./data/mirror/usr/bin/dd-push-release-branch"
+    bin.install "./data/mirror/usr/bin/dd-start-release"
   end
 end
