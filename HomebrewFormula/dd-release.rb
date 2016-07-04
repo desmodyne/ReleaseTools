@@ -17,7 +17,6 @@ class TtRelease < Formula
   version "tools"
   sha256 ""
 
-  depends_on "cmake" => :build
   depends_on "coreutils" # realpath is part of coreutils
   depends_on "git-flow"
   depends_on "bash"
