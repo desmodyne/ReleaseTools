@@ -13,6 +13,7 @@ class TtRelease < Formula
   desc "DesmoDyne ReleaseTools for automating the release process."
   homepage "desmodyne.com"
   url "https://gitlab.com/DesmoDyne/Tools/ReleaseTools"
+  head "https://gitlab.com/DesmoDyne/Tools/ReleaseTools", :branch => "feature/8/add_homebrew_tap_for_teamtools"
   version "tools"
   sha256 ""
 
