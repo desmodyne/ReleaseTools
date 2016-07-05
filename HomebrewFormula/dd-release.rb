@@ -18,7 +18,7 @@ class TtRelease < Formula
   sha256 ""
 
   depends_on "coreutils" # realpath is part of coreutils
-  depends_on "git-flow"
+  depends_on "git-flow-avh"
   depends_on "bash"
   
   def install
