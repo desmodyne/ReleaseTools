@@ -104,7 +104,7 @@ packages_folder_name='packages'
 working_folder="tmp/${script_name}"
 
 # path from working folder back to target project root
-# TODO: this obviously depends on ${working_folder} on should be calculated
+# TODO: this obviously depends on ${working_folder} and should be calculated
 path_from_working_folder_to_project_root="../.."
 
 
@@ -116,6 +116,11 @@ path_from_working_folder_to_project_root="../.."
 pushd "${repo_root}" > /dev/null
 
 
+# delete files OS X keeps creating so they are not added to the package;
+# this occurs with project spaces shared between OSs, e.g. using sshfs
+# TODO: lintian reports these, use messages to review / debug this
+find . \( -iname '._*' -or -iname '.DS_Store' \) -delete
+
 # remove and (re-) create temporary working folder
 if [ -d "${working_folder}" ]
 then
@@ -125,11 +130,6 @@ mkdir -p "${working_folder}"
 
 # change to working folder
 pushd "${working_folder}" > /dev/null
-
-# delete files OS X keeps creating so they are not added to the package;
-# this occurs with project spaces shared between OSs, e.g. using sshfs
-# TODO: lintian reports these, use messages to review / debug this
-find . \( -iname '._*' -or -iname '.DS_Store' \) -delete
 
 # TODO: distinguish building code vs. building packages ?
 

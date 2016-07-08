@@ -138,7 +138,7 @@ fi
 # shellcheck disable=SC2034
 archive_area='non-free'
 
-# determine git branch or target project to determine distribution channel
+# determine git branch of target project to determine distribution channel
 git_branch=$(git -C "${repo_root}" rev-parse --symbolic-full-name --abbrev-ref HEAD)
 
 if [[ "${git_branch}" != 'develop' && \
