@@ -22,8 +22,8 @@ echo
 
 case "${OSTYPE}" in
     darwin*)
-        # http://stackoverflow.com/a/37170755
-        :
+        grep='ggrep'
+        sed='gsed'
         ;;
     *)
         echo "Unsupported operating system: ${OSTYPE}"
@@ -53,6 +53,7 @@ else
 fi
 
 
+# TODO: error handling
 # TODO: prevent processing repo this file is in during development ?
 # TODO: verify required executables are available before using them ?
 # TODO: script return value when run as Jenkins job ?!?
@@ -82,15 +83,31 @@ package_folder="$(jq -r '.Artifacts.packages' "${project_conf}")"
 # for multi-package projects, package names are determined further below
 package_name="$(echo "${project_name}" | tr '[:upper:]' '[:lower:]')"
 
+# TODO: instead of pulling package version out of the CMake file, it should
+# be stored in project.json from where it can be retrieved much easier and
+# both the CMake file as well as this code should obtain it from there;
+# however, this requires the patch version bumping to be refactored, tool
+# which especially for multi-package project is not trivial
+
+# NOTE: see also dd-bump-patch-version
+
+# path to CMake / CPack config file, relative to root of target project
+path_to_cmake_conf="build/CMakeLists.txt"
+
+# regular expression pattern for line defining major version
+major_regex='(set\(CPACK_PACKAGE_VERSION_MAJOR\s+")([0-9]+)("\))'
+
+# regular expression pattern for line defining minor version
+minor_regex='(set\(CPACK_PACKAGE_VERSION_MINOR\s+")([0-9]+)("\))'
+
+# regular expression pattern for line defining patch version
+patch_regex='(set\(CPACK_PACKAGE_VERSION_PATCH\s+")([0-9]+)("\))'
+
 # git archive format; see git archive --list for supported formats
 git_archive_format='tar.gz'
 
 # git branch of target project
 git_branch=$(git -C "${repo_root}" rev-parse --symbolic-full-name --abbrev-ref HEAD)
-
-# TODO: for a proper out-of-tree build, any files created as part of the build
-# should be located in e.g. ${repo_root}/../Temp; unfortunately, Jenkins fails
-# to support that, so need to use ${repo_root}/tmp instead - disappointing! :-(
 
 
 # -----------------------------------------------------------------------------
@@ -113,8 +130,18 @@ then
 fi
 mkdir -p "${package_folder}"
 
-# TODO: get real project version from somewhere
-archive_name="${package_name}.1.2.3.tar.gz"
+
+major_line=$("${grep}" -E "${major_regex}" "${path_to_cmake_conf}")
+minor_line=$("${grep}" -E "${minor_regex}" "${path_to_cmake_conf}")
+patch_line=$("${grep}" -E "${patch_regex}" "${path_to_cmake_conf}")
+
+major_version="$(echo "${major_line}" | "${sed}" -r -e "s|${major_regex}|\2|g")"
+minor_version="$(echo "${minor_line}" | "${sed}" -r -e "s|${minor_regex}|\2|g")"
+patch_version="$(echo "${patch_line}" | "${sed}" -r -e "s|${patch_regex}|\2|g")"
+
+archive_name="${package_name}"
+archive_name+=".${major_version}.${minor_version}.${patch_version}"
+archive_name+=".${git_archive_format}"
 
 git archive --format="${git_archive_format}"              \
             --output="${package_folder}/${archive_name}"  \
