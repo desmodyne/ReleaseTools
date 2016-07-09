@@ -68,13 +68,13 @@ repo_root="$(realpath "$1")"
 
 # path to multi-package project configuration
 # root folder, relative to root of target project
-path_to_multi_proj_root="packages"
+path_to_multi_proj_root='packages'
 
 # path to project configuration file, relative to root of target project
-path_to_proj_conf="build/CMakeLists.txt"
+path_to_proj_conf='project.json'
 
 # regular expression pattern for line defining patch version
-patch_regex='(set\(CPACK_PACKAGE_VERSION_PATCH\s+")([0-9]+)("\))'
+patch_regex='(    "patch" : ")([0-9]+)(")'
 
 # message for committing changes to project configuration file
 # TODO: add project and release names ?
@@ -100,34 +100,38 @@ function bump_patch_version
     # TODO: verify required executables are available before using them ?
     # TODO: script return value when run as Jenkins job ?!?
 
-    # get line with current patch version
-    patch_line=$("${grep}" -E "${patch_regex}" "${project_config}")
-
-    if [ -z "${patch_line}" ]
-    then
-        echo "Failed to find line with package version patch"
-        return 1
-    fi
-
     # get current patch version number and increment it
-    patch_version="$(echo "${patch_line}" | "${sed}" -r -e "s|${patch_regex}|\2|g")"
+    patch_version="$(jq -r '.Version.patch' "${project_config}")"
 
-    if [ -z "${patch_version}" ]
+    res="$?"
+
+    # TODO: if [ -z "${patch_version}" ] ?
+
+    if [ "${res}" -ne 0 ]
     then
-        echo "Failed to get package version patch number from line ${patch_line}"
-        return 1
+        message="Failed to get package version patch number from "
+        message+="project configuration file ${project_config}"
+        echo "${message}"
+        return "${res}"
     fi
 
-    patch_version=$((patch_version+1))
+    patch_version=$((patch_version + 1))
 
     # replace current with new patch version
+    # TODO: using jq would be a lot simpler, but jq chooses to re-format file
+    # in an arbitrary style and there seems to be now way to configure that :-(
+    # NOTE: it doesn't seem possible to modify the JSON file
+    # in place; see also http://stackoverflow.com/a/24943373
+    # json_data="$(jq ".Version.patch = \"${patch_version}\"" "${project_config}")"
+    # echo "${json_data}" | jq '.'  # > "${project_config}"
     "${sed}" -i -r -e "s|${patch_regex}|\1${patch_version}\3|g" "${project_config}"
 
     res="$?"
 
     if [ "${res}" -ne 0 ]
     then
-        echo "Failed to replace current with new patch version in line ${patch_line}"
+        message="Failed to replace current with new patch version in "
+        message+="project configuration file ${project_config}"
         # TODO: (here and below):
         # https://github.com/koalaman/shellcheck/wiki/SC2152
         return "${res}"
