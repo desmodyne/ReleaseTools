@@ -148,7 +148,7 @@ fi
 repo_root="$(realpath "$1")"
 
 # absolute path to target project configuration
-project_conf="${repo_root}/project.json"
+path_to_proj_conf="${repo_root}/project.json"
 
 # determine git branch of target project to determine distribution channel
 git_branch=$(git -C "${repo_root}" rev-parse --symbolic-full-name --abbrev-ref HEAD)
@@ -361,7 +361,7 @@ fi
 
 echo
 
-artifacts_json="$(jq '.Artifacts' "${project_conf}")"
+artifacts_json="$(jq '.Artifacts' "${path_to_proj_conf}")"
 artifacts_types="$(echo "${artifacts_json}" | jq -r 'keys[]' )"
 
 for artifacts_type in ${artifacts_types}
@@ -403,7 +403,7 @@ do
 
     if [ "${artifacts_type}" = 'configuration' ]
     then
-        ship_name="$(jq -r '.ShipName' "${project_conf}")"
+        ship_name="$(jq -r '.ShipName' "${path_to_proj_conf}")"
         # shellcheck disable=SC2059
         remote_loc_leaf=$(printf "${remote_loc_leaf}" "${ship_name}")
     fi
