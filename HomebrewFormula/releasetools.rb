@@ -25,13 +25,11 @@ class Releasetools < Formula
   desc "DesmoDyne ReleaseTools"
   # TODO: create wiki page and add link
   homepage "http://www.desmodyne.com"
-  # TODO: distribute production version using archive,
-  # e.g. url "https://example.com/foo-0.1.tar.gz"
-  url "https://gitlab.com/DesmoDyne/Tools/ReleaseTools"
+  url "http://packages.desmodyne.com/protected/osx/dists/feature/releasetools.0.1.4.tar.gz"
   # TODO: add sha256 sum
   sha256 ""
   # TODO: investigate ways to better deal with dev / feature branch versions
-  head "https://gitlab.com/DesmoDyne/Tools/ReleaseTools", :branch => "feature/8/align_brew_deployment"
+  # head "https://gitlab.com/DesmoDyne/Tools/ReleaseTools", :branch => "feature/8/align_brew_deployment"
   # TODO: keep this in sync with CPACK_PACKAGE_VERSION_* in CMakeLists.txt
   version "0.1.4"
 
