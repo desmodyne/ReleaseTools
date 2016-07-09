@@ -80,28 +80,18 @@ package_folder="$(jq -r '.Artifacts.packages' "${project_conf}")"
 # for multi-package projects, package names are determined further below
 package_name="$(echo "${project_name}" | tr '[:upper:]' '[:lower:]')"
 
-# TODO: instead of pulling package version out of the CMake file, it should
-# be stored in project.json from where it can be retrieved much easier and
-# both the CMake file as well as this code should obtain it from there;
-# however, this requires the patch version bumping to be refactored, tool
-# which especially for multi-package project is not trivial
-
-# NOTE: see also dd-bump-patch-version
-
-# path to CMake / CPack config file, relative to root of target project
-path_to_cmake_conf="build/CMakeLists.txt"
-
-# regular expression pattern for line defining major version
-major_regex='(set\(CPACK_PACKAGE_VERSION_MAJOR\s+")([0-9]+)("\))'
-
-# regular expression pattern for line defining minor version
-minor_regex='(set\(CPACK_PACKAGE_VERSION_MINOR\s+")([0-9]+)("\))'
-
-# regular expression pattern for line defining patch version
-patch_regex='(set\(CPACK_PACKAGE_VERSION_PATCH\s+")([0-9]+)("\))'
+# major minor patch project / package version
+major_version="$(jq -r '.Version.major' "${project_conf}")"
+minor_version="$(jq -r '.Version.minor' "${project_conf}")"
+patch_version="$(jq -r '.Version.patch' "${project_conf}")"
 
 # git archive format; see git archive --list for supported formats
 git_archive_format='tar.gz'
+
+# archive file name
+archive_name="${package_name}"
+archive_name+=".${major_version}.${minor_version}.${patch_version}"
+archive_name+=".${git_archive_format}"
 
 # git branch of target project
 git_branch=$(git -C "${repo_root}" rev-parse --symbolic-full-name --abbrev-ref HEAD)
@@ -127,19 +117,7 @@ then
 fi
 mkdir -p "${package_folder}"
 
-
-major_line=$("${grep}" -E "${major_regex}" "${path_to_cmake_conf}")
-minor_line=$("${grep}" -E "${minor_regex}" "${path_to_cmake_conf}")
-patch_line=$("${grep}" -E "${patch_regex}" "${path_to_cmake_conf}")
-
-major_version="$(echo "${major_line}" | "${sed}" -r -e "s|${major_regex}|\2|g")"
-minor_version="$(echo "${minor_line}" | "${sed}" -r -e "s|${minor_regex}|\2|g")"
-patch_version="$(echo "${patch_line}" | "${sed}" -r -e "s|${patch_regex}|\2|g")"
-
-archive_name="${package_name}"
-archive_name+=".${major_version}.${minor_version}.${patch_version}"
-archive_name+=".${git_archive_format}"
-
+echo "Create archive .../${package_folder}/${archive_name}"
 git archive --format="${git_archive_format}"              \
             --output="${package_folder}/${archive_name}"  \
             "${git_branch}"
