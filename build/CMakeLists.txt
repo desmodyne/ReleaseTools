@@ -26,9 +26,9 @@ get_filename_component(PROJECT_ROOT "${PROJECT_SOURCE_DIR}/.." REALPATH)
 
 set(CPACK_GENERATOR                     "DEB")
 set(CPACK_PACKAGE_NAME                  ${PROJECT_NAME})
-set(CPACK_PACKAGE_VERSION_MAJOR         "0")
-set(CPACK_PACKAGE_VERSION_MINOR         "1")
-set(CPACK_PACKAGE_VERSION_PATCH         "3")
+get_project_setting(".Version.major" CPACK_PACKAGE_VERSION_MAJOR)
+get_project_setting(".Version.minor" CPACK_PACKAGE_VERSION_MINOR)
+get_project_setting(".Version.patch" CPACK_PACKAGE_VERSION_PATCH)
 
 set(CPACK_PACKAGE_FILE_NAME             "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY   "DesmoDyne ReleaseTools")
