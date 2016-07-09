@@ -62,9 +62,6 @@ fi
 # -----------------------------------------------------------------------------
 # configure script parameters
 
-# name of this script: http://stackoverflow.com/q/192319
-script_name="$(basename "$0")"
-
 # absolute path to the root folder of the repository to process
 # on Debian, install realpath using e.g. aptitude install realpath
 # on OS X, use grealpath: http://apple.stackexchange.com/a/88812

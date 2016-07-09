@@ -18,17 +18,28 @@ echo
 
 case "${OSTYPE}" in
 
-    # darwin*)
-    #     grep='ggrep'
-    #     sed='gsed'
-    #
-    #     # NOTE: on OSX, BSD (?) ping is different:
-    #     # alexa:~ ssc$ ping -c 1 bogushost
-    #     # ping: cannot resolve bogushost: Unknown host
-    #     # alexa:~ echo $?
-    #     # 68
-    #
-    #     ;;
+    # this assumes packages being uploaded were built on this host
+    # and there is no "cross-package-building" taking place, ie.
+    # no creating Debian 32-bit packages on a Ubuntu 64-bit host
+
+    darwin*)
+        grep='ggrep'
+        sed='gsed'
+
+        # OS X distribution
+        distribution='osx'
+
+        # ping return code that goes with error below
+        ping_code=68
+
+        # ping error message for fixable problem
+        ping_err_msg_tmpl='ping: cannot resolve %s: Unknown host'
+
+        # second part of remote folder location, see also usage below;
+        # distribution_channel is not defined here yet, so it will be amended
+        remote_loc_leaf_tmpl="${distribution}/dists/%s"
+
+        ;;
 
     linux*)
         # shellcheck disable=SC2034
@@ -39,23 +50,54 @@ case "${OSTYPE}" in
 
         res="$?"
 
-        if [ "${res}" -eq 0 ]
+        if [ "${res}" -ne 0 ]
         then
-            # make sure this is run only on Debian / Ubuntu systems
-            if [ "${dist_name}" != 'Debian' ] && [ "${dist_name}" != 'Ubuntu' ]
-            then
-                echo "Unsupported Linux distribution: ${dist_name}"
-                exit -1
-            fi
-        else
             echo "Could not determine Linux distribution name"
             exit "${res}"
         fi
 
+        # make sure this is run only on Debian / Ubuntu systems
+        if [ "${dist_name}" != 'Debian' ] && [ "${dist_name}" != 'Ubuntu' ]
+        then
+            echo "Unsupported Linux distribution: ${dist_name}"
+            exit -1
+        fi
+
+        # determine Linux distribution (e.g. debian, ubuntu)
+        # TODO: shellcheck seems to be a little overactive here...
+        # shellcheck disable=SC2034
+        distribution=$(echo "${dist_name}" | tr '[:upper:]' '[:lower:]')
+
+        # get architecture to derive distribution bitness (e.g. i386, amd64)
+        arch=$(arch)
+
+        if   [[ "${arch}" == 'i686' ]]
+        then
+            # shellcheck disable=SC2034
+            distribution_folder='binary-i386'
+        elif [[ "${arch}" == 'x86_64' ]]
+        then
+            # shellcheck disable=SC2034
+            distribution_folder='binary-amd64'
+        else
+            echo "Unsupported architecture ${arch}"
+            exit -1
+        fi
+
+        # archive area: http://askubuntu.com/a/27514
+        # https://www.debian.org/doc/debian-policy/ch-archive.html
+        # shellcheck disable=SC2034
+        archive_area='non-free'
+
+        # second part of remote folder location, see also usage below;
+        # distribution_channel is not defined here yet, so it will be amended
+        remote_loc_leaf_tmpl="${distribution}/dists/%s/"
+        remote_loc_leaf_tmpl+="${archive_area}/${distribution_folder}"
+
         # ping return code 2 is too generic to be useful
         ping_code=2
 
-        # ping error message for recoverable problem;
+        # ping error message for fixable problem
         ping_err_msg_tmpl='ping: unknown host %s'
 
         ;;
@@ -107,36 +149,6 @@ repo_root="$(realpath "$1")"
 
 # absolute path to target project configuration
 project_conf="${repo_root}/project.json"
-
-# these assume packages being uploaded were built on this host
-# and there is no "cross-package-building" taking place, ie.
-# no creating Debian 32-bit packages on a Ubuntu 64-bit host
-
-# determine Linux distribution (e.g. Debian, Ubuntu)
-# TODO: shellcheck seems to be a little overactive here...
-# shellcheck disable=SC2034
-distribution=$(lsb_release --id --short | tr '[:upper:]' '[:lower:]')
-
-# determine architecture to determine distribution bitness (e.g. i386, amd64)
-arch=$(arch)
-
-if   [[ "${arch}" == 'i686' ]]
-then
-    # shellcheck disable=SC2034
-    distribution_folder='binary-i386'
-elif [[ "${arch}" == 'x86_64' ]]
-then
-    # shellcheck disable=SC2034
-    distribution_folder='binary-amd64'
-else
-    echo "Unsupported architecture ${arch}"
-    exit -1
-fi
-
-# archive area: http://askubuntu.com/a/27514
-# https://www.debian.org/doc/debian-policy/ch-archive.html
-# shellcheck disable=SC2034
-archive_area='non-free'
 
 # determine git branch of target project to determine distribution channel
 git_branch=$(git -C "${repo_root}" rev-parse --symbolic-full-name --abbrev-ref HEAD)
@@ -210,7 +222,7 @@ remote_user="$(echo "${user_info}" | cut -d : -f 1)"
 remote_loc_tmpl='/var/www/desmodyne.com/%s/public_html/protected'
 
 # second part of remote folder location;
-# defined by Debian standard for packages; defined by us for other artifacts
+# defined by Debian for Debian packages; defined by us for other artifacts
 declare -A remote_loc_leaves
 
 # configuration is yet to be amended by ship name; downloads isn't used yet
@@ -219,9 +231,9 @@ declare -A remote_loc_leaves
 remote_loc_leaves['configuration']="%s/${distribution_channel}"
 # shellcheck disable=SC2154
 remote_loc_leaves['downloads']=""
-# shellcheck disable=SC2154
-remote_loc_leaves['packages']="${distribution}/dists/${distribution_channel}/"
-remote_loc_leaves['packages']+="${archive_area}/${distribution_folder}"
+# shellcheck disable=SC2059,SC2154
+remote_loc_leaves['packages']="$(printf "${remote_loc_leaf_tmpl}" \
+                                        "${distribution_channel}")"
 
 # rsync switches
 rsync_switches='--archive --checksum --verbose'
