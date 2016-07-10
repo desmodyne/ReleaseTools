@@ -15,9 +15,11 @@
 case "${OSTYPE}" in
     darwin*)
         do_update_formula_repo=true
+        do_update_package_server=false
         ;;
     linux*)
         do_update_formula_repo=false
+        do_update_package_server=true
         ;;
     *)
         echo "Unsupported operating system: ${OSTYPE}"
@@ -117,5 +119,8 @@ res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 
 # TODO: should this really be done here ?
 
-dd-update-package-server "${repo_root}"
-res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+if [ "${do_update_package_server}" = true ]
+then
+    dd-update-package-server "${repo_root}"
+    res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+fi
