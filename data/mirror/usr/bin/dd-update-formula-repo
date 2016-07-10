@@ -81,6 +81,9 @@ formula_folder='tmp/formula'
 # brew formula file name glob
 formula_glob="*.rb"
 
+# brew formula repo git URL; must use SSH for key-based access
+formula_repo_url='https://gitlab.com/DesmoDyne/homebrew-tools'
+
 # path to brew formula project base, relative to root folder of this project;
 # this is the folder into which all formula git repos are cloned to locally
 # NOTE: it would make things a lot easier if this folder was relative to the
@@ -106,17 +109,27 @@ commit_message='[#1]: update brew package formula'
 # (last line in) git commit response when there are no changes to commit
 git_response='nothing to commit, working directory clean'
 
+# absolute path to brew formula repo root
+brew_repo_root="${path_to_this_script}/${path_to_project_root}/"
+brew_repo_root+="${path_to_formula_project_base}/${path_to_formula_repo_root}"
+brew_repo_root="$(realpath "${brew_repo_root}")"
+
 
 # -----------------------------------------------------------------------------
 # update brew package formula repo
 
 
+if [ -d "${brew_repo_root}" ]
+then
+    # clone git repo if it does not exist yet
+    echo 'Clone brew package formula git repo:'
+    echo "git clone ${formula_repo_url} ${brew_repo_root}"
+    git clone "${formula_repo_url}" "${brew_repo_root}"
+    res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+fi
+
+
 # change to brew formula repo root
-# TODO: clone git repo if it does not exist locally yet
-brew_repo_root="${path_to_this_script}/${path_to_project_root}/"
-brew_repo_root+="${path_to_formula_project_base}/${path_to_formula_repo_root}"
-
-
 pushd "${brew_repo_root}" > /dev/null
 
 
