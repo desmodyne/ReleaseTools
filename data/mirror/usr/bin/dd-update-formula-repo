@@ -119,7 +119,7 @@ brew_repo_root="$(realpath "${brew_repo_root}")"
 # update brew package formula repo
 
 
-if [ -d "${brew_repo_root}" ]
+if [ ! -d "${brew_repo_root}" ]
 then
     # clone git repo if it does not exist yet
     echo 'Clone brew package formula git repo:'
@@ -127,11 +127,6 @@ then
     git clone "${formula_repo_url}" "${brew_repo_root}"
     res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 fi
-
-
-# change to brew formula repo root
-pushd "${brew_repo_root}" > /dev/null
-
 
 # TODO: in the end, the brew formula repo must run automatically in parallel to
 # the project repo: create feature branches, merge them to develop, create
@@ -143,11 +138,38 @@ pushd "${brew_repo_root}" > /dev/null
 # and keeps switching it back to that branch; a 1:1 project:formula repo branch
 # is possible, but pointless; establish a convention how to deal with this
 
-# git branch of brew formula repo
-git_branch=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
+# git branches of the two repositories involved
+formula_branch=$(git -C "${brew_repo_root}" \
+                     rev-parse --symbolic-full-name --abbrev-ref HEAD)
+project_branch=$(git -C "${repo_root}" \
+                     rev-parse --symbolic-full-name --abbrev-ref HEAD)
+
+msgtmpl='Project repository at %s\n  is on branch %s;\n'
+msgtmpl+='formula repository at %s\n  is on branch %s'
+# shellcheck disable=SC2059
+message="$(printf "${msgtmpl}" "${repo_root}"      "${project_branch}" \
+                               "${brew_repo_root}" "${formula_branch}")"
+echo -n "${message}"
+
+if [ "${project_branch}" = "${formula_branch}" ]
+then
+    echo ': OK'
+    echo
+else
+    echo
+    echo 'Project and brew formula repositories are on different branches;'
+    echo 'please align them, then run this script again. Sorry about that.'
+    exit -1
+fi
+
 
 # TODO: test if repo is in sync with origin; update if not
 # git status ...
+
+
+# change to brew formula repo root
+pushd "${brew_repo_root}" > /dev/null
+
 
 source_file_glob="${repo_root}/${formula_folder}/${formula_glob}"
 # shellcheck disable=SC2086
@@ -173,7 +195,7 @@ fi
 target_folder="${path_to_formula_folder}"
 
 message="$(printf 'Copy brew formula\n   %s\nto %s : ' \
-                  "${source_file}"             \
+                  "${source_file}"                     \
                   "$(realpath "${brew_repo_root}/${target_folder}")/")"
 echo -n "${message}"
 cp "${source_file}" "${target_folder}"
@@ -187,7 +209,8 @@ echo
 # git prints its own error messages
 
 echo -n 'Stage changes: '
-git add "${project_config}"
+# TODO: git add formula only
+git add "${target_folder}"
 res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 echo 'OK'
 echo
@@ -205,14 +228,15 @@ do_push_changes=true
 
 if [ "${res}" -ne 0 ]
 then
-    if [ -z "$(echo "${output}" | grep "${git_response}")" ]
+    # https://github.com/koalaman/shellcheck/wiki/SC2143
+    if echo "${output}" | grep -q "${git_response}"
     then
+        echo "${output}"
+        do_push_changes=false
+    else
         echo "${output}"
         popd > /dev/null
         exit "${res}"
-    else
-        echo "${output}"
-        do_push_changes=false
     fi
 fi
 
