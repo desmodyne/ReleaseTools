@@ -56,7 +56,11 @@ fi
 repo_root="$(realpath "$1")"
 
 # list of tools called by this script
-req_tools='dd-update-formula-repo dd-update-package-server dd-upload-artifacts'
+# NOTE: as long as all these scripts belong to ReleaseTools, there is no need
+# to assemble this list in an OS-dependent manner; ReleaseTools scripts will
+# either be available as a whole or not at all, no matter what OS we're on
+req_tools='dd-update-formula-repo dd-update-package-server '
+req_tools+='dd-upload-artifacts dd-verify-user-configuration'
 
 # absolute path to this script: http://stackoverflow.com/a/9107028
 path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -110,6 +114,9 @@ fi
 
 if [ "${do_update_formula_repo}" = true ]
 then
+    dd-verify-user-configuration "${repo_root}"
+    res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+
     dd-update-formula-repo "${repo_root}"
     res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 fi
