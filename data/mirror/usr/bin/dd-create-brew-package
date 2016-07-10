@@ -57,6 +57,7 @@ fi
 # TODO: prevent processing repo this file is in during development ?
 # TODO: verify required executables are available before using them ?
 # TODO: script return value when run as Jenkins job ?!?
+# TODO: check target project git repo status and flag output if unclean
 
 
 # -----------------------------------------------------------------------------
