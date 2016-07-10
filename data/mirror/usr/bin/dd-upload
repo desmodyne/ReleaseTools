@@ -10,6 +10,23 @@
 
 
 # -----------------------------------------------------------------------------
+# determine platform: http://stackoverflow.com/a/18434831
+
+case "${OSTYPE}" in
+    darwin*)
+        do_update_formula_repo=true
+        ;;
+    linux*)
+        do_update_formula_repo=false
+        ;;
+    *)
+        echo "Unsupported operating system: ${OSTYPE}"
+        exit -1
+        ;;
+esac
+
+
+# -----------------------------------------------------------------------------
 # process command line arguments
 
 if [ $# -ne 1 ]
@@ -37,8 +54,7 @@ fi
 repo_root="$(realpath "$1")"
 
 # list of tools called by this script
-req_tools='dd-verify-user-configuration dd-upload-artifacts '
-req_tools+='dd-update-package-server'
+req_tools='dd-update-formula-repo dd-update-package-server dd-upload-artifacts'
 
 # absolute path to this script: http://stackoverflow.com/a/9107028
 path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -84,6 +100,12 @@ fi
 
 # TODO: this must not be done mindlessly, but only after (manual) test
 # and approval, so there should at least be a warning when this is run
+
+if [ "${do_update_formula_repo}" = true ]
+then
+    dd-update-formula-repo "${repo_root}"
+    res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+fi
 
 dd-upload-artifacts "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
