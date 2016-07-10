@@ -103,6 +103,9 @@ path_to_formula_folder='Formula'
 # TODO: add info on what version of what script did the commit ?
 commit_message='[#1]: update brew package formula'
 
+# (last line in) git commit response when there are no changes to commit
+git_response='nothing to commit, working directory clean'
+
 
 # -----------------------------------------------------------------------------
 # update brew package formula repo
@@ -142,6 +145,7 @@ number_of_source_files="$(echo "${source_file}" | wc -l)"
 if [ "${number_of_source_files}" -eq 0 ]
 then
     echo "Failed to find a brew formula in ${repo_root}/${formula_folder}"
+    popd > /dev/null;
     exit -1
 fi
 
@@ -149,6 +153,8 @@ if [ "${number_of_source_files}" -lt 1 ]
 then
     echo "Found more than one brew formula:"
     echo "${source_file}"
+    popd > /dev/null;
+    exit -1
 fi
 
 target_folder="${path_to_formula_folder}"
@@ -158,7 +164,7 @@ message="$(printf 'Copy brew formula\n   %s\nto %s : ' \
                   "$(realpath "${brew_repo_root}/${target_folder}")/")"
 echo -n "${message}"
 cp "${source_file}" "${target_folder}"
-res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 echo 'OK'
 echo
 
@@ -174,14 +180,35 @@ echo 'OK'
 echo
 
 echo 'Commit changes:'
-git commit --message "${commit_message}"
-res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
-echo
+output="$(git commit --message "${commit_message}")"
 
-echo 'Push changes:'
-git push origin
-res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+res="$?"
 
+do_push_changes=true
+
+# git does not seem to support
+# specific return codes per error:
+# http://stackoverflow.com/q/4917871
+
+if [ "${res}" -ne 0 ]
+then
+    if [ -z "$(echo "${output}" | grep "${git_response}")" ]
+    then
+        echo "${output}"
+        popd > /dev/null
+        exit "${res}"
+    else
+        echo "${output}"
+        do_push_changes=false
+    fi
+fi
+
+if [ "${do_push_changes}" = true ]
+then
+    echo 'Push changes:'
+    git push origin
+    res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+fi
 
 # change back to previous location
 popd > /dev/null
