@@ -101,7 +101,6 @@ formula_tmpl_folder='data/tmpl'
 formula_tmpl_name="${package_name}.rb.j2"
 
 # brew formula folder, relative to target project root
-# TODO: consider brew formula an artifact ?
 formula_folder='tmp/formula'
 
 # brew formula file name
@@ -172,10 +171,10 @@ path_to_virt_env_script="${HOME}/.virtualenvs/dd/bin/activate"
 pushd "${repo_root}" > /dev/null
 
 
-# NOTE: the brew package formula is created here (by rendering a template
-# provided by the target project); staging it in the brew formula git repo and
-# committing the change is considered equivalent to updating a Debian package
-# server index and is done at a later stage - TODO: add doc on where and when
+# NOTE: the brew package formula is created here by rendering a template
+# provided by the target project; staging it in the brew formula git repo and
+# committing and pushing the change is considered equivalent to updating a
+# Debian package server index and is done in dd-update-formula-repo
 
 # remove and (re-) create formula folder
 if [ -d "${formula_folder}" ]

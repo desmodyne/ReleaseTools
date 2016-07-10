@@ -101,6 +101,11 @@ fi
 # TODO: this must not be done mindlessly, but only after (manual) test
 # and approval, so there should at least be a warning when this is run
 
+# NOTE: as an alternate approach, a brew formula could be considered an artifact
+# and be "uploaded" to the brew formula repo by dd-upload-artifacts; the actions
+# required for those tasks are really different though and putting both into
+# the same script would impurify that script's purpose and make it really large
+
 if [ "${do_update_formula_repo}" = true ]
 then
     dd-update-formula-repo "${repo_root}"
