@@ -24,6 +24,8 @@ case "${OSTYPE}" in
     darwin*)
         dd-create-brew-package "$@"
         res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+        dd-create-brew-package-formula "$@"
+        res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
         ;;
     linux*)
         dd-create-debian-package "$@"

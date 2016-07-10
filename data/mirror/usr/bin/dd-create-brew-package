@@ -22,8 +22,8 @@ echo
 
 case "${OSTYPE}" in
     darwin*)
-        grep='ggrep'
-        sed='gsed'
+        # http://stackoverflow.com/a/12405621
+        :
         ;;
     *)
         echo "Unsupported operating system: ${OSTYPE}"
@@ -53,7 +53,7 @@ else
 fi
 
 
-# TODO: error handling
+# TODO: error handling; access project config file only once
 # TODO: prevent processing repo this file is in during development ?
 # TODO: verify required executables are available before using them ?
 # TODO: script return value when run as Jenkins job ?!?
@@ -61,12 +61,6 @@ fi
 
 # -----------------------------------------------------------------------------
 # configure script parameters
-
-# absolute path to this script: http://stackoverflow.com/a/9107028
-path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# path from this script to project root
-path_to_project_root='../../../..'
 
 # absolute path to the root folder of the repository to process
 # on Debian, install realpath using e.g. aptitude install realpath
@@ -82,8 +76,7 @@ project_name="$(jq -r '.Project' "${project_conf}")"
 # package output folder, relative to target project root
 package_folder="$(jq -r '.Artifacts.packages' "${project_conf}")"
 
-# for single-package projects, package name is project name in lower case;
-# for multi-package projects, package names are determined further below
+# package name is project name in lower case
 package_name="$(echo "${project_name}" | tr '[:upper:]' '[:lower:]')"
 
 # major minor patch project / package version
@@ -102,76 +95,6 @@ archive_name="${package_name}.${version}.${archive_format}"
 
 # git branch of target project
 git_branch=$(git -C "${repo_root}" rev-parse --symbolic-full-name --abbrev-ref HEAD)
-
-if [[ "${git_branch}" != 'develop' && \
-      "${git_branch}" !=  feature* && \
-      "${git_branch}" != 'master'  && \
-      "${git_branch}" !=  release* ]]
-then
-    echo "Unsupported git branch / distribution channel ${git_branch}"
-    exit -1
-fi
-
-if   [[ "${git_branch}" ==  'develop' ]]
-then
-    # shellcheck disable=SC2034
-    distribution_channel='develop'
-elif [[ "${git_branch}" ==   feature* ]]
-then
-    # shellcheck disable=SC2034
-    distribution_channel='feature'
-elif [[ "${git_branch}" ==  'master'  ]]
-then
-    # shellcheck disable=SC2034
-    distribution_channel='master'
-elif [[ "${git_branch}" ==   release* ]]
-then
-    # shellcheck disable=SC2034
-    distribution_channel='release'
-fi
-
-# credentials used to access protected section of update server
-# TODO: get these from elsewhere or better, use SSH key instead
-username='flw'
-password='Ei4!hcxL'
-
-# packages / update server hostname
-hostname='packages.desmodyne.com'
-
-# path on server to brew packages folder
-server_path="protected/osx/dists/${distribution_channel}"
-
-# full brew package download url
-url="http://${username}:${password}@${hostname}/${server_path}/${archive_name}"
-
-# path to brew formula project base, relative to root folder of this project;
-# this is the folder into which all formula git repos are cloned to locally
-path_to_formula_project_base='../../DesmoDyne'
-
-# TODO: clone git repo if it does not exist locally yet
-
-# map project name as defined in project.json to
-#  1. brew formula git repo root, relative to formula project base
-#  2. path to brew formula template, relative to brew formula git repo base
-#  3. path to brew formula, relative to brew formula git repo base
-declare -A formula_info_map
-
-# shellcheck disable=SC2154
-formula_info_map["niceTools"]='homebrew-tools:data/tmpl/nicetools.rb.j2:Formula/nicetools.rb'
-# shellcheck disable=SC2154
-formula_info_map["ReleaseTools"]='homebrew-tools:data/tmpl/releasetools.rb.j2:Formula/releasetools.rb'
-
-# template json data string template
-read -r -d '' tmpl_data_tmpl <<'EOT'
-{
-    "sha256"  : "%s",
-    "url"     : "%s",
-    "version" : "%s"
-}
-EOT
-
-# absolute path to Python virtual environment activation script
-path_to_virt_env_script="${HOME}/.virtualenvs/dd/bin/activate"
 
 
 # -----------------------------------------------------------------------------
@@ -199,41 +122,6 @@ git archive --format="${archive_format}"              \
             --output="${package_folder}/${archive_name}"  \
             "${git_branch}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
-
-# calculate SHA256 checksum, required for brew formula
-sha256="$(shasum -a 256 "${package_folder}/${archive_name}" | cut -d ' ' -f 1)"
-
-
-# change back to previous location
-popd > /dev/null
-
-
-# -----------------------------------------------------------------------------
-# update brew package formula
-
-
-# change to formula repo root folder
-formula_repo="${path_to_this_script}/${path_to_project_root}/"
-formula_repo+="${path_to_formula_project_base}/"
-formula_repo+="$(echo "${formula_info_map[${project_name}]}" | cut -d : -f 1)"
-pushd "${formula_repo}" > /dev/null
-
-# shellcheck disable=SC2059
-tmpl_data="$(printf "${tmpl_data_tmpl}" "${sha256}" "${url}" "${version}")"
-
-formula_path="$(echo "${formula_info_map[${project_name}]}" | cut -d : -f 3)"
-formula_tmpl="$(echo "${formula_info_map[${project_name}]}" | cut -d : -f 2)"
-
-# switch to virtual Python environment; required to use j2
-# https://github.com/koalaman/shellcheck/wiki/SC1090
-# shellcheck source=${HOME}/.virtualenvs/dd/bin/activate
-source "${path_to_virt_env_script}"
-
-echo "Create formula $(realpath "${formula_repo}")/${formula_path}"
-echo "${tmpl_data}" | j2 --format=json "${formula_tmpl}" > "${formula_path}"
-
-# leave virtual Python environment
-deactivate
 
 
 # change back to previous location
