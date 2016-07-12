@@ -60,6 +60,41 @@ fi
 # absolute path to the root folder of the repository to process
 repo_root="$(realpath "$1")"
 
+# path to project configuration file, relative to root of target project
+path_to_proj_conf='project.json'
+
+# absolute path to project configuration file
+project_config="${repo_root}/${path_to_proj_conf}"
+
+# version scheme: either semver (major.minor.patch, http://semver.org) or
+# YYYY.CW (CW = calendar week) typically used for multi-package projects where
+# each package has a semantic version and yet another triple would confuse
+if [ "$(jq '.Version.major' "${project_config}")" = 'null' ] &&
+   [ "$(jq '.Version.minor' "${project_config}")" = 'null' ] &&
+   [ "$(jq '.Version.patch' "${project_config}")" = 'null' ]
+then
+    # 'YYYY.CW'
+
+    # name of the release; as a release is created to publish the efforts of
+    # the past week, the calender week is that of last week; if a release tag
+    # with that name already exists, a new release name is tried out by
+    # appending .01, .02, .03, etc. until one is found that doesn't exist yet
+    # TODO: I think this past week / this week thing is really confusing
+    canonical_release_name="$(date +"%Y").$(( $(date +"%V") - 1))"
+else
+    # semver
+
+    # TODO: this assumes that the patch version will be bumped and nothing else
+    # TODO: this duplicates functionality from dd-bump-patch-version
+    major="$(jq -r '.Version.major' "${project_config}")"
+    minor="$(jq -r '.Version.minor' "${project_config}")"
+    patch="$(jq -r '.Version.patch' "${project_config}")"
+
+    patch=$((patch + 1))
+
+    canonical_release_name="${major}.${minor}.${patch}"
+fi
+
 # name of default git repo remote
 default_remote_name='origin'
 
@@ -84,13 +119,6 @@ local_master_regex="^[ |*] ${master_branch}$"
 
 # same as above, but for remote branches
 remote_master_regex="^  ${default_remote_name}/${master_branch}$"
-
-# name of the release, follows YYYY.CW pattern; as a release is created to
-# publish the efforts of the past week, the calender week is that of last week;
-# if a release tag with that name already exists; a new release name is tried
-# by appending .01, .02, .03, etc. until one that doesn't exist is found
-# TODO: this is calculated this way several times and should come from elsewhere
-canonical_release_name="$(date +"%Y").$(( $(date +"%V") - 1))"
 
 # TODO: document for the team that under OSX, git-flow-avh must be installed,
 # not git-flow; the latter causes this script to fail due to one stupid bug:
