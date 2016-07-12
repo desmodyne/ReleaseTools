@@ -184,7 +184,7 @@ then
     exit -1
 fi
 
-if [ "${number_of_source_files}" -lt 1 ]
+if [ "${number_of_source_files}" -gt 1 ]
 then
     echo "Found more than one brew formula:"
     echo "${source_file}"
