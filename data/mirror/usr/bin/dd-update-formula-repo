@@ -82,6 +82,7 @@ formula_folder='tmp/formula'
 formula_glob="*.rb"
 
 # brew formula repo git URL; must use SSH for key-based access
+# TODO: migrate this to new organization / development infrastructure
 formula_repo_url='https://gitlab.com/DesmoDyne/homebrew-tools'
 
 # path to brew formula project base, relative to root folder of this project;

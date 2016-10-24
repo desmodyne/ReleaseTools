@@ -91,20 +91,8 @@ res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 dd-start-release "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 
-# TODO: get this to work with Chronic Server:
-# https://gitlab.com/DesmoDyne/Projects/Chronic/ChronicServer/issues/28
-
-if [[ "${repo_root}" == *'ChronicServer' ]]
-then
-    message="Project in ${repo_root} does not provide a project "
-    message+="configuration file; skipping patch version bumping"
-    # TODO: review output / align with other sections
-    echo "${message}"
-    echo
-else
-    dd-bump-patch-version "${repo_root}"
-    res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
-fi
+dd-bump-patch-version "${repo_root}"
+res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 
 dd-create-release-notes "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
