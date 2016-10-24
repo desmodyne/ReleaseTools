@@ -105,7 +105,7 @@ path_to_formula_folder='Formula'
 # message for committing changes to brew formula
 # TODO: add project and release names ?
 # TODO: add info on what version of what script did the commit ?
-commit_message='[#1]: update brew package formula'
+commit_message='#1: update brew package formula'
 
 # (last line in) git commit response when there are no changes to commit
 git_response='nothing to commit, working directory clean'

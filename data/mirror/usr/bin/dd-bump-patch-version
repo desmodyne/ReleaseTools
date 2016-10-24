@@ -77,7 +77,7 @@ patch_regex='(    "patch" : ")([0-9]+)(")'
 
 # message for committing changes to project configuration file
 # TODO: add project and release names ?
-commit_message='[#1]: bump patch version'
+commit_message='#1: bump patch version'
 
 
 # -----------------------------------------------------------------------------
