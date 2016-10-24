@@ -67,7 +67,7 @@ fi
 repo_root="$(realpath "$1")"
 
 # path to project configuration file, relative to root of target project
-path_to_proj_conf='project.json'
+path_to_proj_conf='project.conf'
 
 # regular expression pattern template for multiple lines defining patch version
 multi_line_patch_regex_tmpl='("%s"[^p]*"patch" : ")([0-9]+)(")'
@@ -117,7 +117,7 @@ then
     # multi-package project
 
     # TODO: plausibility check against .../packages/* ?
-    # TODO: package names in project.json use _, folder names use -
+    # TODO: package names in project.conf use _, folder names use -
     package_names="$(jq -r '.Version | keys []' "${project_config}")"
 
     for package_name in ${package_names}

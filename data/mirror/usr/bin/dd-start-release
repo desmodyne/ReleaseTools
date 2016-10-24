@@ -61,7 +61,7 @@ fi
 repo_root="$(realpath "$1")"
 
 # path to project configuration file, relative to root of target project
-path_to_proj_conf='project.json'
+path_to_proj_conf='project.conf'
 
 # absolute path to project configuration file
 project_config="${repo_root}/${path_to_proj_conf}"

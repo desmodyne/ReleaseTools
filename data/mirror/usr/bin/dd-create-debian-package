@@ -82,7 +82,7 @@ script_name="$(basename "$0")"
 repo_root="$(realpath "$1")"
 
 # absolute path to target project configuration
-project_conf="${repo_root}/project.json"
+project_conf="${repo_root}/project.conf"
 
 # get name of target project from configuration
 project_name="$(jq -r '.Project' "${project_conf}")"
@@ -101,7 +101,7 @@ packages_folder_name='packages'
 
 # path to temporary working folder, relative to target project root
 # TODO: this 'tmp' should stay in sync with 'tmp/artifacts' setting
-# for 'Artifacts.packages' from project.json configuration file
+# for 'Artifacts.packages' from project.conf configuration file
 working_folder="tmp/${script_name}"
 
 # path from working folder back to target project root

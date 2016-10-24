@@ -12,7 +12,7 @@ function(get_project_setting json_key result)
     execute_process(COMMAND "jq" "-r" ${json_key}
                     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
                     OUTPUT_VARIABLE local_result
-                    INPUT_FILE "${CMAKE_SOURCE_DIR}/../project.json")
+                    INPUT_FILE "${CMAKE_SOURCE_DIR}/../project.conf")
     string(STRIP ${local_result} local_result)
     set(${result} ${local_result} PARENT_SCOPE)
 endfunction()
