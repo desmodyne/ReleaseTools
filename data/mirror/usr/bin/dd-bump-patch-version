@@ -115,6 +115,13 @@ error_flag=false
 
 version="$(jq -r '.Version' "${project_config}")"
 
+if [ "${version}" = 'null' ]
+then
+    echo "Failed to find version information in ${project_config}"
+    echo
+    exit -1
+fi
+
 # resolve file / json element references
 
 if [ "$(echo "${version}" | jq -r '. | keys[]')" = '_include' ]
