@@ -76,11 +76,11 @@ rel_prefix='release'
 
 # path to folder where release notes will be stored,
 # relative to root folder of repository to process
-output_folder='doc/txt/Release Notes'
+output_folder='doc/md/Release Notes'
 
 # name of the generated release notes file;
 # release name will be amended further below
-output_filename="$(date +"%Y%m%d") Release Notes <release name>.txt"
+output_filename="$(date +"%Y%m%d") Release Notes <release name>.md"
 
 # message for committing release notes
 # TODO: add project and release names ?
@@ -167,9 +167,12 @@ output_filename="${output_filename//<release name>/${current_branch}}"
 # TODO: --format=format:<string> ?
 # TODO: internal / external release notes ?
 # TODO: make order and format configurable ?
+# TODO: verify local master tracks remote master and is current
 
-git rev-list --topo-order --format=fuller \
-   "${prev_release}..${this_release}"   \
+# http://stackoverflow.com/a/2099492
+git rev-list --topo-order --format=fuller   \
+   "${prev_release}..${this_release}"       \
+ | awk '$0="    "$0'                        \
  > "${output_folder}/${output_filename}"
  res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 
