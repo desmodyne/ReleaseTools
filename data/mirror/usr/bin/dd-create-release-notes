@@ -84,7 +84,7 @@ output_filename="$(date +"%Y%m%d") Release Notes <release name>.md"
 
 # message for committing release notes
 # TODO: add project and release names ?
-commit_message='#1: add release notes'
+commit_message='[#1]: add release notes'
 
 
 # NOTE: pushd / popd require bash
