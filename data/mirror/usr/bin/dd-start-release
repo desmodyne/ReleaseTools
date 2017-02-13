@@ -212,8 +212,8 @@ then
 else
     # semver
 
-    # TODO: this assumes that the patch version will be bumped and nothing else
-    # TODO: this duplicates functionality from dd-bump-patch-version
+    # TODO: this assumes that the patch version will be updated and nothing else
+    # TODO: this duplicates functionality from dd-update-project-version
     major="$(jq -r '.Version.major' "${project_config}")"
     minor="$(jq -r '.Version.minor' "${project_config}")"
     patch="$(jq -r '.Version.patch' "${project_config}")"

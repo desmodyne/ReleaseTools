@@ -57,7 +57,7 @@ pushd "${repo_root}" > /dev/null
 # push the release branch
 
 # NOTE: this script expects to be called in the following context:
-# dd-release has started a release, bumped the patch version and created
+# dd-release has started a release, updated the project version and created
 # release notes; the target repo is on the release branch and there are no
 # tags yet; only the release branch needs to be pushed to origin
 

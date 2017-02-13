@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# dd-bump-patch-version
+# dd-update-project-version
 #
-# increase version number patch level by 1
+# update semantic version in project configuration
 #
 # author  : stefan schablowski
 # contact : stefan.schablowski@desmodyne.com
@@ -14,7 +14,7 @@
 
 
 echo
-echo 'dd-bump-patch-version:'
+echo 'dd-update-project-version:'
 echo
 
 # -----------------------------------------------------------------------------
@@ -77,11 +77,11 @@ patch_regex='([ ]+"patch"[ ]+:[ ]+")([0-9]+)(")'
 
 # message for committing changes to project configuration file
 # TODO: add project and release names ?
-commit_message='[#1]: bump patch version'
+commit_message='[#1]: update project version'
 
 
 # -----------------------------------------------------------------------------
-# bump patch version
+# update project version
 
 
 # NOTE: pushd / popd require bash
@@ -90,7 +90,7 @@ pushd "${repo_root}" > /dev/null
 
 project_config="${repo_root}/${path_to_proj_conf}"
 
-echo "Bump patch version in ${project_config}"
+echo "Update project version in ${project_config}"
 
 # verify project configuration exists before accessing it
 if [ ! -f "${project_config}" ]
@@ -261,7 +261,7 @@ fi
 
 if [ "${error_flag}" = true ]
 then
-    message="Not all package patch versions were bumped successfully; "
+    message="Not all package patch versions were updated successfully; "
     message+="please review log output above and fix before proceeding"
     echo "${message}"
     popd > /dev/null
@@ -287,5 +287,5 @@ popd > /dev/null
 
 
 echo
-echo 'dd-bump-patch-version: success'
+echo 'dd-update-project-version: success'
 echo

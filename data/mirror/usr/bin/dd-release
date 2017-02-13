@@ -131,7 +131,7 @@ repo_root="$(realpath "${folder}")"
 
 # list of tools called by this script
 req_tools='dd-verify-user-configuration dd-start-release '
-req_tools+='dd-bump-patch-version dd-create-release-notes '
+req_tools+='dd-update-project-version dd-create-release-notes '
 req_tools+='dd-push-release-branch'
 
 # absolute path to this script: http://stackoverflow.com/a/9107028
@@ -184,7 +184,7 @@ res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 dd-start-release "${repo_root}" "${semver}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 
-dd-bump-patch-version "${repo_root}"
+dd-update-project-version "${repo_root}" "${semver}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 
 dd-create-release-notes "${repo_root}"
