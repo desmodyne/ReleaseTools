@@ -43,12 +43,6 @@ echo
 
 function usage
 {
-
-    # TODO: do not use global variables
-    # TODO: space between << and 'EOT' makes a
-    # difference for atom syntax highlighting
-    # TODO: align properly and remove leading space when printing ?
-
     read -r -d '' msg_tmpl <<'EOT'
 Usage: %s folder [version]
 
@@ -118,7 +112,6 @@ fi
 # MAJOR.MINOR.PATCH versioning: http://semver.org
 # https://en.wikipedia.org/wiki/Software_versioning
 
-# TODO: semver also allows e.g. 1, 2.0, 3.0.* and others
 semver_regex='^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'
 
 
@@ -153,7 +146,7 @@ fi
 # -----------------------------------------------------------------------------
 # configure script parameters, cont.
 
-# absolute path to the root folder of the repository to process
+# absolute path to root folder of repository to process
 repo_root="$(realpath "${folder}")"
 
 # path to project configuration file, relative to root of target project

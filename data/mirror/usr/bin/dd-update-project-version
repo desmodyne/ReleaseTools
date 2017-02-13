@@ -41,36 +41,143 @@ esac
 
 
 # -----------------------------------------------------------------------------
+# define functions
+
+# TODO: this duplicates the same code in dd-release
+
+# http://stackoverflow.com/a/6212408
+
+function usage
+{
+    read -r -d '' msg_tmpl <<'EOT'
+Usage: %s folder [version]
+
+mandatory arguments:
+  folder                project repository root folder
+
+optional arguments:
+  semver                semantic project version to release
+  -?, --help            print this help message
+EOT
+
+    # shellcheck disable=SC2059
+    printf "${msg_tmpl}\n" "${script_name}"
+}
+
+
+# -----------------------------------------------------------------------------
 # process command line arguments
 
-if [ $# -ne 1 ]
+# TODO: this duplicates the same code in dd-release
+
+# name of this script: http://stackoverflow.com/q/192319
+script_name="$(basename "$0")"
+
+# http://stackoverflow.com/a/14203146
+while [ $# -gt 0 ]
+do
+    key="$1"
+
+    case "${key}" in
+      # NOTE: must escape -?, seems to act as wildcard otherwise
+      -\?|--help) usage; exit 1 ;;
+
+      *)  if [ -z "${folder}" ]
+          then
+              folder="$1"
+          else
+              if [ -z "${semver}" ]
+              then
+                  semver="$1"
+              else
+                  usage
+                  exit 1
+              fi
+          fi
+    esac
+
+    # move past argument or value
+    shift
+done
+
+
+# folder is a mandatory command line argument
+if [ -z "${folder}" ]
 then
-    echo "Usage: $(basename "$0") <repository root folder>"
-    exit -1
-else
-    if [ ! -e "$1" ]
-    then
-        echo "$1: No such file or directory"
-        exit -1
-    fi
-    if [ ! -d "$1" ]
-    then
-        echo "$1: Not a directory"
-        exit -1
-    fi
+    usage
+    exit 1
 fi
+
 
 # -----------------------------------------------------------------------------
 # configure script parameters
 
+# TODO: this (almost) duplicates the corresponding code in dd-release
+
+# regular expression that matches a semantic version:
+# MAJOR.MINOR.PATCH versioning: http://semver.org
+# https://en.wikipedia.org/wiki/Software_versioning
+
+# TODO: is there any 'cross-regex dialect' way to use a single regex only ?
+
+# TODO: this version works with bash [[ <string> =~ <regex> ]]
+semver_regex_bash='^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'
+
+# TODO: this version works with sed and retrieves matches
+semver_regex='^\([[:digit:]]\+\)\.\([[:digit:]]\+\)\.\([[:digit:]]\+\)$'
+
+# -----------------------------------------------------------------------------
+# validate command line arguments
+
+# TODO: this duplicates the same code in dd-release
+
+if [ ! -e "${folder}" ]
+then
+    echo "${folder}: No such file or directory"
+    exit 1
+fi
+
+if [ ! -d "${folder}" ]
+then
+    echo "${folder}: Not a directory"
+    exit 1
+fi
+
+if [ -n "${semver}" ]
+then
+    if [[ ! "${semver}" =~ ${semver_regex_bash} ]]
+    then
+        echo "${semver}: Invalid semantic version"
+        exit 1
+    fi
+fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont.
+
 # absolute path to root folder of repository to process
-repo_root="$(realpath "$1")"
+repo_root="$(realpath "${folder}")"
 
 # path to project configuration file, relative to root of target project
 path_to_proj_conf='project.conf'
 
+# TODO: review path_to_proj_conf_folder vs. project_config
+
+# absolute path to project configuration file
+project_config="${repo_root}/${path_to_proj_conf}"
+
+# path to folder with project configuration file, relative to project root
+path_to_proj_conf_folder="$(dirname "${project_config}")"
+
 # regular expression pattern template for multiple lines defining patch version
 multi_line_patch_regex_tmpl='("%s"[^p]*"patch" : ")([0-9]+)(")'
+
+# regular expression pattern for line defining major version
+major_regex='([ ]+"major"[ ]+:[ ]+")([0-9]+)(")'
+
+# regular expression pattern for line defining minor version
+minor_regex='([ ]+"minor"[ ]+:[ ]+")([0-9]+)(")'
 
 # regular expression pattern for line defining patch version
 patch_regex='([ ]+"patch"[ ]+:[ ]+")([0-9]+)(")'
@@ -129,17 +236,69 @@ then
     reference="$(echo "${version}" | jq -r '._include')"
     file_ref="$(echo "${reference}" | cut -d : -f 1)"
     json_ref="$(echo "${reference}" | cut -d : -f 2)"
-    version="$(jq ".${json_ref}" "${file_ref}")"
+    version="$(jq ".${json_ref}" "${path_to_proj_conf_folder}/${file_ref}")"
 
-    # TODO: this duplicates single-package project code below
-    patch_version="$(echo "${version}" | jq -r '.patch')"
-    patch_version=$((patch_version + 1))
+    path_to_version_conf="$(realpath "${path_to_proj_conf_folder}/${file_ref}")"
 
-    # absolute path to version configuration file
-    path_to_version_conf="${repo_root}/${file_ref}"
+    # semantic version is passed as script argument
+    if [ -n "${semver}" ]
+    then
+        # TODO: get jq filters from conf ?
+        major="$(echo "${version}" | jq -r '.major')"
+        minor="$(echo "${version}" | jq -r '.minor')"
+        patch="$(echo "${version}" | jq -r '.patch')"
 
-    "${sed}" -i -r -e "s|${patch_regex}|\1${patch_version}\3|g" \
-                      "${path_to_version_conf}"
+        existing_semver="${major}.${minor}.${patch}"
+
+        # verify semver is greater than current version
+        if [[ ! "${semver}" > "${existing_semver}" ]]
+        then
+            msg_tmpl='Version argument %s is not greater '
+            msg_tmpl+='than existing version %s\ndefined in %s'
+            msg="$(printf "${msg_tmpl}" "${semver}"             \
+                                        "${existing_semver}"    \
+                                        "${path_to_version_conf}")"
+            echo "${msg}"
+            exit 1
+        fi
+
+        new_major="$(echo "${semver}" | "${sed}" -e "s|${semver_regex}|\1|g")"
+        new_minor="$(echo "${semver}" | "${sed}" -e "s|${semver_regex}|\2|g")"
+        new_patch="$(echo "${semver}" | "${sed}" -e "s|${semver_regex}|\3|g")"
+
+        # NOTE: if single quotes are added here, sed fails with
+        # gsed: -e expression #1, char 1: unknown command: `''
+        sed_expr_01="s|${major_regex}|\1${new_major}\3|g"
+        sed_expr_02="s|${minor_regex}|\1${new_minor}\3|g"
+        sed_expr_03="s|${patch_regex}|\1${new_patch}\3|g"
+
+        if ! "${sed}" -i -r -e "${sed_expr_01}"   \
+                            -e "${sed_expr_02}"   \
+                            -e "${sed_expr_03}"   \
+                            "${path_to_version_conf}"
+        then
+            msg_tmpl='Failed to update project version in %s'
+            msg="$(printf "${msg_tmpl}" "${path_to_version_conf}")"
+            echo "${msg}"
+            exit 1
+        fi
+
+
+    # if no semver, only bump the patch version
+    else
+        # TODO: this duplicates single-package project code below
+        patch_version="$(echo "${version}" | jq -r '.patch')"
+        patch_version=$((patch_version + 1))
+
+        if ! "${sed}" -i -r -e "s|${patch_regex}|\1${patch_version}\3|g" \
+                               "${path_to_version_conf}"
+        then
+            msg_tmpl='Failed to update patch version in %s\n'
+            msg="$(printf "${msg_tmpl}" "${path_to_version_conf}")"
+            echo "${msg}"
+            exit 1
+        fi
+    fi
 
     target_file="${path_to_version_conf}"
 
