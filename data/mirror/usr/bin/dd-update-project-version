@@ -255,6 +255,7 @@ then
         then
             msg_tmpl='Version argument %s is not greater '
             msg_tmpl+='than existing version %s\ndefined in %s'
+            # shellcheck disable=SC2059
             msg="$(printf "${msg_tmpl}" "${semver}"             \
                                         "${existing_semver}"    \
                                         "${path_to_version_conf}")"
@@ -278,6 +279,7 @@ then
                             "${path_to_version_conf}"
         then
             msg_tmpl='Failed to update project version in %s'
+            # shellcheck disable=SC2059
             msg="$(printf "${msg_tmpl}" "${path_to_version_conf}")"
             echo "${msg}"
             exit 1
@@ -294,6 +296,7 @@ then
                                "${path_to_version_conf}"
         then
             msg_tmpl='Failed to update patch version in %s\n'
+            # shellcheck disable=SC2059
             msg="$(printf "${msg_tmpl}" "${path_to_version_conf}")"
             echo "${msg}"
             exit 1

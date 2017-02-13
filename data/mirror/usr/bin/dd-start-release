@@ -233,6 +233,7 @@ else
     then
         msg_tmpl='version argument %s is not greater '
         msg_tmpl+='than existing version %s\ndefined in %s'
+        # shellcheck disable=SC2059
         msg="$(printf "${msg_tmpl}" "${semver}"             \
                                     "${existing_semver}"    \
                                     "${path_to_version_conf}")"
