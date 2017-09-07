@@ -83,8 +83,12 @@ project_name="$(jq -r '.Project' "${project_conf}")"
 # package output folder, relative to target project root
 package_folder="$(jq -r '.Artifacts.packages' "${project_conf}")"
 
-# package name is project name in lower case
-package_name="$(echo "${project_name}" | tr '[:upper:]' '[:lower:]')"
+# package name is project name in lower case and camel case
+# amended by dashes, e.g. ReleaseTools --> release-tools:
+# see also dd-create-brew-package-formula next to this script
+package_name="$( echo "${project_name::1}" | tr '[:upper:]' '[:lower:]')"
+package_name+="$(echo "${project_name:1}"  | sed -e 's|\([A-Z]\)|-\1|g' \
+                                           | tr '[:upper:]' '[:lower:]')"
 
 # major minor patch project / package version
 major_version="$(jq -r '.Version.major' "${project_conf}")"
