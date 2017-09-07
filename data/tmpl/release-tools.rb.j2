@@ -1,4 +1,4 @@
-# releasetools.rb
+# release-tools.rb
 #
 # ReleaseTools brew formula
 #
@@ -8,25 +8,38 @@
 
 
 # http://apple.stackexchange.com/a/97205
-# https://github.com/Homebrew/brew/blob/master/share/doc/homebrew/README.md
-# https://github.com/Homebrew/brew/blob/master/share/doc/homebrew/Formula-Cookbook.md
-# https://github.com/Homebrew/brew/blob/master/share/doc/homebrew/How-to-Create-and-Maintain-a-Tap.md
-# https://github.com/Homebrew/legacy-homebrew/tree/master/share/doc/homebrew
-# http://formalfriday.club/2015/01/05/creating-your-own-homebrew-tap-and-formula.html
+# https://github.com/Homebrew/brew/blob/master/docs/README.md
+# https://github.com/Homebrew/brew/blob/master/docs/Formula-Cookbook.md
+# https://github.com/Homebrew/brew/blob/master/docs/How-to-Create-and-Maintain-a-Tap.md
+# https://docs.brew.sh
 
 
-# TODO: should be ReleaseTools, but brew needs Releasetools;
-# rename this file (and brew package) to release-tools ?!?
-# also, Ruby class names must start with a capital letter,
-# otherwise this fails with
-#   <filename>:13: class/module name must be CONSTANT
-#   class releasetools < Formula
-#                       ^
-class Releasetools < Formula
+# formula file and Ruby class name concept:
+# https://github.com/Homebrew/brew/blob/master/ ...
+#  ... docs/Formula-Cookbook.md#a-quick-word-on-naming
+
+class ReleaseTools < Formula
   # TODO: get this from PackageDescription.txt
   desc "DesmoDyne ReleaseTools"
   # TODO: create wiki page and add link
-  homepage "http://www.desmodyne.com"
+  homepage "https://gitlab.com/DesmoDyne/Tools/ReleaseTools"
+  # NOTE: this is a private brew package repo referencing a private source repo;
+  # downloading a package from the source repo fails with error message
+  #   curl: (22) The requested URL returned error: 401 Unauthorized
+  # unless private_token=... request parameter is appended
+  # TODO: improve / align access to the brew repo currently granted by ~/.netrc:
+  # https://gist.github.com/mlafeldt/8e7d50ee0b1de44e256d
+  # TODO: this exposes the ansible private gitlab token; do this differently,
+  # e.g. using a GitLab version of brew GitHub support: see e.g.
+  #   https://github.com/Homebrew/brew/blob/master/Library/Homebrew/ ...
+  #    ... download_strategy.rb > GitHubPrivateRepositoryDownloadStrategy and
+  #    ... github.com/Homebrew/brew/blob/master/Library/Homebrew/utils/github.rb
+  # https://wheniwork.engineering/ ...
+  #  ... creating-a-private-homebrew-tap-with-gitlab-8800c453d893
+  # NOTE: installation / download can be tested using local formula using e.g.
+  #   GITLAB_HOMEBREW_TOKEN=<snip> brew install --build-from-source ...
+  #     ... <path to repo root>/HomebrewTools/Formula/release-tools.rb
+  # https://github.com/Homebrew/brew/issues/1468
   url "{{ url }}"
   sha256 "{{ sha256 }}"
   # TODO: investigate ways to better deal with dev / feature branch versions
@@ -37,13 +50,25 @@ class Releasetools < Formula
   depends_on "bash"
   # contains realpath and other GNU shell utilities
   depends_on "coreutils"
-  # more in line with Linux versions than git-flow
+  # more in line with Linux versions than git-flow;
+  # git is installed per default on recent macOS versions
+  # and git-flow-avh does not list it as dependency
   depends_on "git-flow-avh"
+  # GNU version of grep named ggrep in brew
+  depends_on "grep"
+  # command-line JSON processor
+  depends_on "jq"
+
+  # TODO: find a way to auto-install j2 Python pip package
 
   # TODO: do this algorithmically ?
   # TODO: use path_to_mirror_folder or so ?
   def install
+    bin.install "./data/mirror/usr/bin/dd-bump-patch-version"
+    bin.install "./data/mirror/usr/bin/dd-create-brew-package"
+    bin.install "./data/mirror/usr/bin/dd-create-brew-package-formula"
     bin.install "./data/mirror/usr/bin/dd-create-debian-package"
+    bin.install "./data/mirror/usr/bin/dd-create-package"
     bin.install "./data/mirror/usr/bin/dd-create-release-notes"
     bin.install "./data/mirror/usr/bin/dd-finish-release"
     bin.install "./data/mirror/usr/bin/dd-lint-debian-package"
@@ -52,15 +77,15 @@ class Releasetools < Formula
     bin.install "./data/mirror/usr/bin/dd-push-release-branch"
     bin.install "./data/mirror/usr/bin/dd-release"
     bin.install "./data/mirror/usr/bin/dd-start-release"
+    bin.install "./data/mirror/usr/bin/dd-update-formula-repo"
     bin.install "./data/mirror/usr/bin/dd-update-package-server"
-    bin.install "./data/mirror/usr/bin/dd-update-project-version"
     bin.install "./data/mirror/usr/bin/dd-upload"
     bin.install "./data/mirror/usr/bin/dd-upload-artifacts"
     bin.install "./data/mirror/usr/bin/dd-verify-user-configuration"
   end
 
-  # TODO: test: https://github.com/Homebrew/brew/blob/master/share/doc/ ...
-  #              ... homebrew/Formula-Cookbook.md#add-a-test-to-the-formula
+  # TODO: test: https://github.com/Homebrew/brew/blob/master/docs/ ...
+  #              ... Formula-Cookbook.md#add-a-test-to-the-formula
 
 end
 
