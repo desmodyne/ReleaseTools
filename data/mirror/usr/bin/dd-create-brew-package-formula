@@ -165,9 +165,6 @@ read -r -d '' tmpl_data_tmpl <<'EOT'
 }
 EOT
 
-# absolute path to Python virtual environment activation script
-path_to_virt_env_script="${HOME}/.virtualenvs/dd/bin/activate"
-
 
 # -----------------------------------------------------------------------------
 # create brew package formula
@@ -198,16 +195,26 @@ tmpl_data="$(printf "${tmpl_data_tmpl}" "${sha256}" "${url}" "${version}")"
 formula_path="${formula_folder}/${formula_name}"
 formula_tmpl="${formula_tmpl_folder}/${formula_tmpl_name}"
 
-# switch to virtual Python environment; required to use j2
-# https://github.com/koalaman/shellcheck/wiki/SC1090
-# shellcheck source=${HOME}/.virtualenvs/dd/bin/activate
-source "${path_to_virt_env_script}"
+if [ ! -e "${formula_tmpl}" ]
+then
+    # from 'man realpath':
+    #   -m, --canonicalize-missing
+    #          no path components need exist or be a directory
+    echo "Failed to find brew formula template $(realpath -m ${formula_tmpl})"
+    exit 1
+fi
 
+# TODO: find a way to auto-install j2 Python pip package
 echo "Create formula $(realpath "${repo_root}/${formula_path}")"
-echo "${tmpl_data}" | j2 --format=json "${formula_tmpl}" > "${formula_path}"
-
-# leave virtual Python environment
-deactivate
+if ! output="$(echo "${tmpl_data}"                        \
+                | j2 --format=json "${formula_tmpl}" 2>&1 \
+                > "${formula_path}")"
+then
+    echo 'Failed to render brew formula template:'
+    echo "${output}"
+    popd > /dev/null
+    exit 1
+fi
 
 
 # change back to previous location
