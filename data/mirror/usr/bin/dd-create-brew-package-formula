@@ -83,6 +83,18 @@ project_name="$(jq -r '.Project' "${project_conf}")"
 # package output folder, relative to target project root
 package_folder="$(jq -r '.Artifacts.packages' "${project_conf}")"
 
+# NOTE: sample ReleaseTools download URL on gitlab.com:
+# https://gitlab.com/api/v3/projects/2113101/repository/ ...
+#  ... archive.tar.gz\?private_token\=<snipped>
+# brew install does not support adding http headers,
+# so private token must be encoded into download url
+# http://stackoverflow.com/a/28361068
+# TODO: the url is visible in eg. ps output, so this represents a security risk
+
+# TODO: is there any way to use this url scheme with a private repo ?
+# https://gitlab.com/gitlab-org/gitlab-ce/issues/19843
+# https://gitlab.com/DesmoDyne/ReleaseTools/repository/archive.tar.gz?ref=0.2.0
+
 # package name is project name in lower case and camel case
 # amended by dashes, e.g. ReleaseTools --> release-tools:
 # https://github.com/Homebrew/brew/blob/master/ ...
@@ -105,7 +117,13 @@ archive_format='tar.gz'
 version="${major_version}.${minor_version}.${patch_version}"
 
 # archive file name
+# TODO: there is a difference between the archive as written into the formula
+# and the archive filename on disk used to calculate checksum; review and align
 # TODO: archive_name="archive.${archive_format}" ?!?
+# TODO: some of this is probably largely specific to gitlab.com
+# TODO: must be in sync with dd-create-brew-package-formula
+# (and possibly others) --> get this from elsewhere (?)
+# TODO: gitlab.com automatically creates archives for releases
 archive_name="${package_name}.${version}.${archive_format}"
 
 # brew formula template folder, relative to target project root
@@ -120,7 +138,8 @@ formula_folder='tmp/formula'
 # brew formula file name
 formula_name="${package_name}.rb"
 
-# TODO: none of this is currently being used
+# TODO: git_branch and distribution_channel are currently not used
+# TODO: the above is not detected by shellcheck
 
 # git branch of target project
 git_branch=$(git -C "${repo_root}" rev-parse --symbolic-full-name --abbrev-ref HEAD)
@@ -156,10 +175,12 @@ fi
 hostname='gitlab.com'
 
 # path on server to brew packages folder
-server_path="DesmoDyne/Tools/ReleaseTools/repository"
+server_path='DesmoDyne/Tools/ReleaseTools/repository'
 
 # full brew package download url
 # TODO: review archive name
+# TODO: protocol - http / https / other
+# TODO: username / password ? SSH key ? other ?
 url="https://${hostname}/${server_path}/archive.tar.gz"
 url+="?ref=${version}&private_token=#{ENV['GITLAB_HOMEBREW_TOKEN']}"
 
@@ -195,6 +216,7 @@ mkdir -p "${formula_folder}"
 
 package_path="${package_folder}/${archive_name}"
 
+# shasum doesn't print usable error messages
 if [ ! -e "${package_path}" ]
 then
     # from 'man realpath':
