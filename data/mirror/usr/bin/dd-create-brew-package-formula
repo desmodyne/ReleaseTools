@@ -105,6 +105,7 @@ archive_format='tar.gz'
 version="${major_version}.${minor_version}.${patch_version}"
 
 # archive file name
+# TODO: archive_name="archive.${archive_format}" ?!?
 archive_name="${package_name}.${version}.${archive_format}"
 
 # brew formula template folder, relative to target project root
@@ -118,6 +119,8 @@ formula_folder='tmp/formula'
 
 # brew formula file name
 formula_name="${package_name}.rb"
+
+# TODO: none of this is currently being used
 
 # git branch of target project
 git_branch=$(git -C "${repo_root}" rev-parse --symbolic-full-name --abbrev-ref HEAD)
@@ -149,19 +152,16 @@ then
     distribution_channel='release'
 fi
 
-# credentials used to access protected section of update server
-# TODO: get these from elsewhere or better, use SSH key instead
-username='flw'
-password='Ei4!hcxL'
-
 # packages / update server hostname
-hostname='packages.desmodyne.com'
+hostname='gitlab.com'
 
 # path on server to brew packages folder
-server_path="protected/osx/dists/${distribution_channel}"
+server_path="DesmoDyne/Tools/ReleaseTools/repository"
 
 # full brew package download url
-url="http://${username}:${password}@${hostname}/${server_path}/${archive_name}"
+# TODO: review archive name
+url="https://${hostname}/${server_path}/archive.tar.gz"
+url+="?ref=${version}&private_token=#{ENV['GITLAB_HOMEBREW_TOKEN']}"
 
 # template json data string template
 read -r -d '' tmpl_data_tmpl <<'EOT'
