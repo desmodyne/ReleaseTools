@@ -105,7 +105,10 @@ version="${major_version}.${minor_version}.${patch_version}"
 archive_name="${package_name}.${version}.${archive_format}"
 
 # git branch of target project
-git_branch=$(git -C "${repo_root}" rev-parse --symbolic-full-name --abbrev-ref HEAD)
+git_branch="$(git -C "${repo_root}" rev-parse --symbolic-full-name \
+                                              --abbrev-ref HEAD)"
+# git SHA-1 sum of current commit
+git_commit="$(git -C "${repo_root}" rev-parse --verify HEAD)"
 
 
 # -----------------------------------------------------------------------------
@@ -128,9 +131,19 @@ then
 fi
 mkdir -p "${package_folder}"
 
+
+# for some reason, git archives downloaded from gitlab.com, e.g.
+# https://gitlab.com/DesmoDyne/Tools/ReleaseTools/repository/0.2.0/archive.tar.gz
+# have the project name, tag (?) and commit hash prepended as root folder, e.g.
+# ReleaseTools-0.2.0-81322dd3abf277ec69cfac481beeb0b0d81306c1
+# need to replay this here using prefix switch for sha256 sum to be correct
+prefix="${project_name}-${version}-${git_commit}"
+
 echo "Create archive ${repo_root}/${package_folder}/${archive_name}"
-git archive --format="${archive_format}"              \
+# https://git-scm.com/docs/git-archive
+git archive --format="${archive_format}"                  \
             --output="${package_folder}/${archive_name}"  \
+            --prefix="${prefix}/"                         \
             "${git_branch}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 
