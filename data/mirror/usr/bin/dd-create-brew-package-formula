@@ -172,11 +172,18 @@ hostname='gitlab.com'
 # path on server to brew packages folder
 server_path='DesmoDyne/Tools/ReleaseTools/repository'
 
-# full brew package download url
+# TODO: align these:
+
+# full brew package download url as used in formula
 # TODO: protocol - http / https / other
 # TODO: username / password ? SSH key ? other ?
-url="https://${hostname}/${server_path}/${archive_name}"
-url+="?ref=${version}&private_token=#{ENV['GITLAB_HOMEBREW_TOKEN']}"
+formula_url="https://${hostname}/${server_path}/${archive_name}"
+formula_url+="?ref=${version}&private_token=#{ENV['GITLAB_HOMEBREW_TOKEN']}"
+
+# full brew package download url as used to download archive
+# TODO: verify GITLAB_HOMEBREW_TOKEN is set before using it
+archive_url="https://${hostname}/${server_path}/${archive_name}"
+archive_url+="?ref=${version}&private_token=${GITLAB_HOMEBREW_TOKEN}"
 
 # template json data string template
 read -r -d '' tmpl_data_tmpl <<'EOT'
@@ -208,7 +215,26 @@ then
 fi
 mkdir -p "${formula_folder}"
 
+# remove and (re-) create package folder
+if [ -d "${package_folder}" ]
+then
+    rm -r "${package_folder}"
+fi
+mkdir -p "${package_folder}"
+
 package_path="${package_folder}/${archive_name}"
+
+# download archive to calculate checksum
+if ! output="$(curl --output "${package_path}"  \
+                    --silent                    \
+                    --show-error                \
+                    "${archive_url}")"
+then
+    echo 'Failed to download brew package from'
+    echo "  ${archive_url}:"
+    echo "${output}"
+    exit 1
+fi
 
 # shasum doesn't print usable error messages
 if [ ! -e "${package_path}" ]
@@ -232,7 +258,7 @@ fi
 sha256="$(echo "${output}" | cut -d ' ' -f 1)"
 
 # shellcheck disable=SC2059
-tmpl_data="$(printf "${tmpl_data_tmpl}" "${sha256}" "${url}" "${version}")"
+tmpl_data="$(printf "${tmpl_data_tmpl}" "${sha256}" "${formula_url}" "${version}")"
 
 formula_path="${formula_folder}/${formula_name}"
 formula_tmpl="${formula_tmpl_folder}/${formula_tmpl_name}"
