@@ -119,8 +119,9 @@ version="${major_version}.${minor_version}.${patch_version}"
 #
 # in order for the archive sha256 checksum rendered into the brew package
 # formula by dd-create-brew-package-formula to be correct, the gitlab.com
-# archive root folder must be replayed when creating a local package
+# archive root folder must be reproduced when creating a local package
 #
+# TODO: the archive checksum is not identical to that for gitlab archive !!
 # TODO: private gitlab.com token is exposed as part of the archive filename
 # TODO: this must be in sync with dd-create-brew-package
 # (and possibly others) --> get this from elsewhere (?)
