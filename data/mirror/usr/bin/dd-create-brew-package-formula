@@ -83,7 +83,7 @@ project_name="$(jq -r '.Project' "${project_conf}")"
 # package output folder, relative to target project root
 package_folder="$(jq -r '.Artifacts.packages' "${project_conf}")"
 
-# NOTE: sample ReleaseTools download URL on gitlab.com:
+# TODO: does this download URL support auth alternatives ?
 # https://gitlab.com/api/v3/projects/2113101/repository/ ...
 #  ... archive.tar.gz\?private_token\=<snipped>
 # brew install does not support adding http headers,
@@ -99,6 +99,7 @@ package_folder="$(jq -r '.Artifacts.packages' "${project_conf}")"
 # amended by dashes, e.g. ReleaseTools --> release-tools:
 # https://github.com/Homebrew/brew/blob/master/ ...
 #  ... docs/Formula-Cookbook.md#a-quick-word-on-naming
+# NOTE: this is different from the archive filename
 # https://stackoverflow.com/a/10218742
 # https://stackoverflow.com/a/10757348
 package_name="$( echo "${project_name::1}" | tr '[:upper:]' '[:lower:]')"
@@ -117,14 +118,8 @@ archive_format='tar.gz'
 version="${major_version}.${minor_version}.${patch_version}"
 
 # archive file name
-# TODO: there is a difference between the archive as written into the formula
-# and the archive filename on disk used to calculate checksum; review and align
-# TODO: archive_name="archive.${archive_format}" ?!?
-# TODO: some of this is probably largely specific to gitlab.com
-# TODO: must be in sync with dd-create-brew-package-formula
-# (and possibly others) --> get this from elsewhere (?)
-# TODO: gitlab.com automatically creates archives for releases
-archive_name="${package_name}.${version}.${archive_format}"
+# see also dd-create-brew-package, search for 'archive file name'
+archive_name="archive.${archive_format}"
 
 # brew formula template folder, relative to target project root
 formula_tmpl_folder='data/tmpl'
@@ -178,10 +173,9 @@ hostname='gitlab.com'
 server_path='DesmoDyne/Tools/ReleaseTools/repository'
 
 # full brew package download url
-# TODO: review archive name
 # TODO: protocol - http / https / other
 # TODO: username / password ? SSH key ? other ?
-url="https://${hostname}/${server_path}/archive.tar.gz"
+url="https://${hostname}/${server_path}/${archive_name}"
 url+="?ref=${version}&private_token=#{ENV['GITLAB_HOMEBREW_TOKEN']}"
 
 # template json data string template
