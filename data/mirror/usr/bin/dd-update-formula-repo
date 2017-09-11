@@ -82,30 +82,30 @@ formula_folder='tmp/formula'
 formula_glob="*.rb"
 
 # brew formula repo git URL; must use SSH for key-based access
-# TODO: migrate this to new organization / development infrastructure
-formula_repo_url='https://gitlab.com/DesmoDyne/homebrew-tools'
+# TODO: don't hardcode gitlab username; eliminate or get from elsewhere
+formula_repo_url='https://dd-ssc@gitlab.com/DesmoDyne/Homebrew/Tools.git'
 
 # path to brew formula project base, relative to root folder of this project;
 # this is the folder into which all formula git repos are cloned to locally
 # NOTE: it would make things a lot easier if this folder was relative to the
 # target project root folder, but that location is passed in here as command
 # line argument and must be considered arbitrary for current and future projects
-path_to_formula_project_base='../../DesmoDyne'
+path_to_formula_project_base='../../../DesmoDyne'
 
 # path to brew formula repo root folder, relative to brew formula project base
 # TODO: this is constant only for as long as there are only Tools brew packages
-path_to_formula_repo_root='homebrew-tools'
+path_to_formula_repo_root='Homebrew/Tools'
 
 # path to brew formula folder, relative to brew formula repo root;
 # defined by homebrew as either empty, 'Formula' or 'HomebrewFormula':
-# https://github.com/Homebrew/brew/blob/master/share/doc/homebrew/ ...
+# https://github.com/Homebrew/brew/blob/master/docs/ ...
 #  ... How-to-Create-and-Maintain-a-Tap.md#creating-a-tap
 path_to_formula_folder='Formula'
 
 # message for committing changes to brew formula
 # TODO: add project and release names ?
 # TODO: add info on what version of what script did the commit ?
-commit_message='#1: update brew package formula'
+commit_message='[#1]: update brew package formula'
 
 # (last line in) git commit response when there are no changes to commit
 git_response='nothing to commit, working directory clean'
