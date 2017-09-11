@@ -64,7 +64,6 @@ class ReleaseTools < Formula
   # TODO: do this algorithmically ?
   # TODO: use path_to_mirror_folder or so ?
   def install
-    bin.install "./data/mirror/usr/bin/dd-bump-patch-version"
     bin.install "./data/mirror/usr/bin/dd-create-brew-package"
     bin.install "./data/mirror/usr/bin/dd-create-brew-package-formula"
     bin.install "./data/mirror/usr/bin/dd-create-debian-package"
@@ -79,6 +78,7 @@ class ReleaseTools < Formula
     bin.install "./data/mirror/usr/bin/dd-start-release"
     bin.install "./data/mirror/usr/bin/dd-update-formula-repo"
     bin.install "./data/mirror/usr/bin/dd-update-package-server"
+    bin.install "./data/mirror/usr/bin/dd-update-project-version"
     bin.install "./data/mirror/usr/bin/dd-upload"
     bin.install "./data/mirror/usr/bin/dd-upload-artifacts"
     bin.install "./data/mirror/usr/bin/dd-verify-user-configuration"
