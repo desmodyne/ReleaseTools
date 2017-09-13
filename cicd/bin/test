@@ -28,5 +28,13 @@ path_to_project_root="$(realpath \
 
 # TODO: verify required executables are available before using them
 
-dd-lint-debian-package "${path_to_project_root}"
+dd-shellcheck "${path_to_project_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+
+# TODO: review this
+case "${OSTYPE}" in
+    linux*)
+        dd-lint-debian-package "${path_to_project_root}"
+        res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+        ;;
+esac
