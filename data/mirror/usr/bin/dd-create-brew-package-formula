@@ -61,6 +61,16 @@ fi
 
 
 # -----------------------------------------------------------------------------
+# validate environment variables
+
+if [ -z "${GITLAB_HOMEBREW_TOKEN}" ]
+then
+    echo "Environment variable GITLAB_HOMEBREW_TOKEN is not set"
+    exit -1
+fi
+
+
+# -----------------------------------------------------------------------------
 # configure script parameters
 
 # absolute path to the root folder of the repository to process
