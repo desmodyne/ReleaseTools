@@ -48,9 +48,17 @@ fi
 # on OS X, use grealpath: http://apple.stackexchange.com/a/88812
 repo_root="$(realpath "$1")"
 
+# absolute path to target project configuration
+project_conf="${repo_root}/project.conf"
+
+if [ ! -e "${project_conf}" ]
+then
+    echo "Failed to find project configuration ${project_conf}"
+    exit 1
+fi
+
 # mirror folder with scripts to install, relative to target project root
-# TODO: this is project-specific, get from project conf
-mirror_folder='data/mirror/usr/bin'
+mirror_folder="$(jq -r '.Paths.mirror_folder' "${project_conf}")"
 
 
 # -----------------------------------------------------------------------------
@@ -61,8 +69,8 @@ mirror_folder='data/mirror/usr/bin'
 pushd "${repo_root}" > /dev/null
 
 
-# TODO: review path and glob
-shellcheck ${mirror_folder}/*
+# TODO: error handling
+shellcheck "${mirror_folder}"/*
 
 
 # change back to previous location

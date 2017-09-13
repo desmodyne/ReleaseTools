@@ -81,8 +81,7 @@ fi
 project_name="$(jq -r '.Project' "${project_conf}")"
 
 # mirror folder with scripts to install, relative to target project root
-# TODO: this is project-specific, get from project conf
-mirror_folder='data/mirror/usr/bin'
+mirror_folder="$(jq -r '.Paths.mirror_folder' "${project_conf}")"
 
 # package output folder, relative to target project root
 package_folder="$(jq -r '.Artifacts.packages' "${project_conf}")"
