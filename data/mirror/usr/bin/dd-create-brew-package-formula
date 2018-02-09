@@ -54,20 +54,11 @@ fi
 
 
 # TODO: error handling; access project config file only once
+# TODO: error handling; remove duplicate code and pushd / popd mess
 # TODO: prevent processing repo this file is in during development ?
 # TODO: verify required executables are available before using them ?
 # TODO: script return value when run as Jenkins job ?!?
 # TODO: major conf effort to get archive name; any better way ?
-
-
-# -----------------------------------------------------------------------------
-# validate environment variables
-
-if [ -z "${GITLAB_HOMEBREW_TOKEN}" ]
-then
-    echo "Environment variable GITLAB_HOMEBREW_TOKEN is not set"
-    exit -1
-fi
 
 
 # -----------------------------------------------------------------------------
@@ -76,6 +67,7 @@ fi
 # absolute path to the root folder of the repository to process
 # on Debian, install realpath using e.g. aptitude install realpath
 # on OS X, use grealpath: http://apple.stackexchange.com/a/88812
+# TODO: validate repo_root before using it
 repo_root="$(realpath "$1")"
 
 # absolute path to target project configuration
@@ -160,13 +152,13 @@ server_path="DesmoDyne/Tools/${project_name}/repository"
 # full brew package download url as used in formula
 # TODO: protocol - http / https / other
 # TODO: username / password ? SSH key ? other ?
+# TODO: use ~/.secrets/git-credentials instead of GITLAB_HOMEBREW_TOKEN
 formula_url="https://${hostname}/${server_path}/${archive_name}"
 formula_url+="?ref=${version}&private_token=#{ENV['GITLAB_HOMEBREW_TOKEN']}"
 
-# full brew package download url as used to download archive
-# TODO: verify GITLAB_HOMEBREW_TOKEN is set before using it
-archive_url="https://${hostname}/${server_path}/${archive_name}"
-archive_url+="?ref=${version}&private_token=${GITLAB_HOMEBREW_TOKEN}"
+# template for full brew package download url
+archive_url_tmpl="https://${hostname}/${server_path}/${archive_name}"
+archive_url_tmpl+="?ref=${version}&private_token=%s"
 
 # template json data string template
 read -r -d '' tmpl_data_tmpl <<'EOT'
@@ -177,6 +169,198 @@ read -r -d '' tmpl_data_tmpl <<'EOT'
     "version" : "%s"
 }
 EOT
+
+
+# -----------------------------------------------------------------------------
+# get git credentials store file
+
+# NOTE: private_token used to be taken from GITLAB_HOMEBREW_TOKEN env var:
+#   https://wheniwork.engineering/ ...
+#    ... creating-a-private-homebrew-tap-with-gitlab-8800c453d893
+# but that is a proprietary solution used by the author of the page above;
+# it exposes sensitive information in an env var which is not acceptable
+#
+# the approach for storing credentials used by git itself is configured in
+# ~/.gitconfig and can be as simple as a a file ~/.secrets/git-credentials:
+#   alexa:~ ssc$ grep -A1 '\[credential\]' ~/.gitconfig
+#   [credential]
+#           helper = store --file=${HOME}/.secrets/git-credentials
+#   alexa:~ ssc$ cat ${HOME}/.secrets/git-credentials | hide-secrets
+#   https://dd-ssc:<access token #01>@gitlab.com
+#   https://ssc.egston:<access token #02>@gitlab.com
+#   https://z00m1n:<access token #03>@github.com
+#
+# in addition, git-credentials supports getting secrets from macOS Keychain:
+# https://help.github.com/articles/caching-your-github-password-in-git
+# https://help.github.com/articles/updating-credentials-from-the-osx-keychain/
+
+# TODO: review existing github / gitlab creds in ~/.secrets, Keychain, etc.
+# TODO: use git ssh:// url and use ssh keys for auth & auth ?
+#       https://help.github.com/articles/connecting-to-github-with-ssh/
+# TODO: git credential does not seem to support getting password as clear text,
+#       so parsing a store file - while not in line with the remaining
+#       git approach - might work, but using e.g. macOS Keychain will not:
+#       https://git-scm.com/book/en/v2/Git-Tools-Credential-Storage
+# TODO: I think I might get carried away a little with error handling here...
+
+# sample output:
+#   alexa:~ ssc$ git config --global --get credential.helper
+#   store --file=${HOME}/.secrets/git-credentials
+#   alexa:~ ssc$ git config --system --get credential.helper
+#   osxkeychain
+
+# NOTE: see https://stackoverflow.com/q/16052602 on git config in general:
+#   alexa:~ ssc$ git config --global --show-origin --get credential.helper
+#   file:${HOME}/.gitconfig	store --file=${HOME}/.secrets/git-credentials
+#   alexa:~ ssc$ git config --system --show-origin --get credential.helper
+#   file:/usr/local/etc/gitconfig	osxkeychain
+# TODO: git -C "${repo_root}" config --local --get credential.helper ?
+
+# NOTE: this seems to correspond to
+#   git config --get --global credential.helper
+if output="$(git config credential.helper)"
+then
+    git_cred_conf="${output}"
+else
+    echo "Failed to get git credentials helper configuration:"
+    echo "${output}"
+    exit 1
+fi
+
+if [ -z "${git_cred_conf}" ]
+then
+    echo "git credentials helper is not configured"
+    exit 1
+fi
+
+# NOTE: bash parameter expansion / substring removal:
+# http://wiki.bash-hackers.org/syntax/pe#substring_removal
+
+# https://stackoverflow.com/a/26910614
+cred_helper="${git_cred_conf%% *}"
+
+if [ "${cred_helper}" != 'store' ]
+then
+    echo "Unsupported git credentials helper ${cred_helper}"
+    exit 1
+fi
+
+# https://unix.stackexchange.com/a/174039
+store_conf="${git_cred_conf##* }"
+
+# https://stackoverflow.com/a/2172367
+if [[ "${store_conf}" != '--file='* ]]
+then
+    echo "Unsupported git credentials store configuration ${store_conf}"
+    exit 1
+fi
+
+creds_file="${store_conf##*=}"
+
+if [ ! -e "${creds_file}" ]
+then
+    echo "git credentials store file does not exist:\\n    ${creds_file}"
+    exit 1
+fi
+
+if [ ! -f "${creds_file}" ]
+then
+    echo "git credentials store file is not a file:\\n    ${creds_file}"
+    exit 1
+fi
+
+if [ ! -r "${creds_file}" ]
+then
+    echo "Can not read git credentials store file:\\n    ${creds_file}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# get username and hostname from origin remote url of repo being processed
+
+if output="$(git -C "${repo_root}" config remote.origin.url)"
+then
+    remote_url="${output}"
+else
+    echo "Failed to get git repository remote URL:"
+    echo "${output}"
+    exit 1
+fi
+
+if [ -z "${remote_url}" ]
+then
+    echo "git repository remote URL is not configured"
+    exit 1
+fi
+
+protocol="${remote_url%%:\/\/*}"
+
+if [ "${protocol}" != 'https' ]
+then
+    echo "Unsupported git protocol ${protocol}"
+    exit 1
+fi
+
+username="${remote_url##*:\/\/}"
+username="${username%%@*}"
+
+if [ -z "${username}" ]
+then
+    msg='Failed to get username from git repository'
+    msg+=" remote URL:\\n    ${remote_url}"
+    echo "${msg}"
+    exit 1
+fi
+
+
+hostname="${remote_url##*@}"
+hostname="${hostname%%/*}"
+
+if [ -z "${hostname}" ]
+then
+    msg='Failed to get hostname from git repository'
+    msg+=" remote URL:\\n    ${remote_url}"
+    echo "${msg}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# get password from git configuration for username and hostname
+
+# TODO: configure stuff (or parts thereof) as script parameters
+
+# regular expression to match line in git creds store file
+regex="^${protocol}://${username}:\(.*\)@${hostname}$"
+
+# sed expression to extract password from matching line
+sed_expr="s|${regex}|\1|g"
+
+
+matching_lines="$(grep "${regex}" "${creds_file}")"
+num_of_lines="$(wc -l <<< "${matching_lines}" | xargs)"
+
+if   [ "${num_of_lines}" -eq 0 ]
+then
+    echo 'Failed to find a matching line in git credentials store'
+    exit 1
+elif [ "${num_of_lines}" -gt 1 ]
+then
+    echo 'Found more than one matching line in git credentials store'
+    exit 1
+fi
+
+access_token="$(gsed -e "${sed_expr}" <<< "${matching_lines}")"
+
+if [ -z "${access_token}" ]
+then
+    echo 'Failed to get access token from git credentials store'
+    exit 1
+fi
+
+# full brew package download url as used to download archive
+archive_url="$(printf "${archive_url_tmpl}" "${access_token}")"
 
 
 # -----------------------------------------------------------------------------
@@ -218,11 +402,12 @@ do
     install+="\"${filename}\","$'\n'
 done
 
-# remove last comma
+# remove comma in last line
 # https://stackoverflow.com/a/12390197
 # -n switch to echo is essential for this to work
 install="$(echo -n "${install}" | sed '$s/,$//')"
 
+# TODO: archive_url contains access_token, so this is a security risk
 
 # download archive to calculate checksum
 if ! output="$(curl --output "${package_path}"  \
