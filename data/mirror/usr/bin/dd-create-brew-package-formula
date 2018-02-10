@@ -149,6 +149,12 @@ server_path="DesmoDyne/Tools/${project_name}/repository"
 
 # TODO: align these:
 
+# FAIL: once the formula is used to install, the GITLAB_HOMEBREW_TOKEN env var
+# is not picked up; code itself is good, but the resulting string is empty;
+# downloading archives generated automatically for every release by gitlab
+# will anyway fail once software packages installed using brew contain binary
+# components (e.g. applications) that must be built prior to distribution
+
 # full brew package download url as used in formula
 # TODO: protocol - http / https / other
 # TODO: username / password ? SSH key ? other ?

@@ -34,12 +34,25 @@ class ReleaseTools < Formula
   #   https://github.com/Homebrew/brew/blob/master/Library/Homebrew/ ...
   #    ... download_strategy.rb > GitHubPrivateRepositoryDownloadStrategy and
   #    ... github.com/Homebrew/brew/blob/master/Library/Homebrew/utils/github.rb
+
+  # WARNING: These posts are incomplete and probably outdated or plain wrong:
   # https://wheniwork.engineering/ ...
   #  ... creating-a-private-homebrew-tap-with-gitlab-8800c453d893
+  # https://vanwollingen.nl/ ...
+  #  ... distributing-private-tools-through-homebrew-d046761fb3a1a
+
   # NOTE: installation / download can be tested using local formula using e.g.
   #   GITLAB_HOMEBREW_TOKEN=<snip> brew install --build-from-source ...
   #     ... <path to repo root>/HomebrewTools/Formula/release-tools.rb
   # https://github.com/Homebrew/brew/issues/1468
+  # UPDATE: the above does not work, env var is not picked up in brew formula;
+  # tested this thoroughly, the Ruby code as such is good, but still won;t work
+  #
+  # as an alternative, implement GitLabPrivateRepositoryDownloadStrategy
+  # following GitHub example:
+  #   https://github.com/Homebrew/brew/pull/1763
+  #   https://github.com/Homebrew/brew/pull/1763/files
+
   url "{{ url }}"
   sha256 "{{ sha256 }}"
   # TODO: investigate ways to better deal with dev / feature branch versions
