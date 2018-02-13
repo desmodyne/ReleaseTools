@@ -22,9 +22,8 @@ echo 'dd-create-package:'
 
 case "${OSTYPE}" in
     darwin*)
-        # TODO: this is only required when code is not stored on gitlab.com
-        # dd-create-brew-package "$@"
-        # res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+        dd-create-brew-package "$@"
+        res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
         dd-create-brew-package-formula "$@"
         res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
         ;;
