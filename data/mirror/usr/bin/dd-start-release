@@ -63,15 +63,49 @@ repo_root="$(realpath "$1")"
 # path to project configuration file, relative to root of target project
 path_to_proj_conf='project.conf'
 
+# TODO: review path_to_proj_conf_folder vs. project_config
+
 # absolute path to project configuration file
 project_config="${repo_root}/${path_to_proj_conf}"
+
+# path to folder with project configuration file, relative to project root
+path_to_proj_conf_folder="$(dirname "${project_config}")"
+
+version="$(jq -r '.Version' "${project_config}")"
+
+if [ "${version}" = 'null' ]
+then
+    echo "Failed to find version information in ${project_config}"
+    echo
+    exit -1
+fi
+
+# resolve file / json element references
+
+if [ "$(echo "${version}" | jq -r '. | keys[]')" = '_include' ]
+then
+    # semver in modular configuration
+
+    reference="$(echo "${version}" | jq -r '._include')"
+    file_ref="$(echo "${reference}" | cut -d : -f 1)"
+    json_ref="$(echo "${reference}" | cut -d : -f 2)"
+    version="$(jq ".${json_ref}" "${path_to_proj_conf_folder}/${file_ref}")"
+
+    major="$(echo "${version}" | jq -r '.major')"
+    minor="$(echo "${version}" | jq -r '.minor')"
+    patch="$(echo "${version}" | jq -r '.patch')"
+
+    patch=$((patch + 1))
+
+    canonical_release_name="${major}.${minor}.${patch}"
+
 
 # version scheme: either semver (major.minor.patch, http://semver.org) or
 # YYYY.CW (CW = calendar week) typically used for multi-package projects where
 # each package has a semantic version and yet another triple would confuse
-if [ "$(jq '.Version.major' "${project_config}")" = 'null' ] &&
-   [ "$(jq '.Version.minor' "${project_config}")" = 'null' ] &&
-   [ "$(jq '.Version.patch' "${project_config}")" = 'null' ]
+elif [ "$(jq '.Version.major' "${project_config}")" = 'null' ] &&
+     [ "$(jq '.Version.minor' "${project_config}")" = 'null' ] &&
+     [ "$(jq '.Version.patch' "${project_config}")" = 'null' ]
 then
     # 'YYYY.CW'
 
