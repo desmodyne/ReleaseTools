@@ -141,6 +141,13 @@ remote_server='update'
 remote_user="$(echo "${user_info}" | cut -d : -f 1)"
 
 
+# TODO: see dd-upload-artifacts
+if [ "$(hostname)" = 'vm-build-nice' ]
+then
+    # shellcheck disable=SC2034
+    SSH_AUTH_SOCK='/home/bob.the.builder/.ssh/ssh_auth_sock'
+fi
+
 # TODO: do these require the same SSH key work as in dd-upload-artifacts ?
 
 

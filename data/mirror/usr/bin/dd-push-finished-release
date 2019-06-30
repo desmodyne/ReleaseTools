@@ -14,6 +14,29 @@ echo 'dd-push-finished-release:'
 echo
 
 # -----------------------------------------------------------------------------
+# determine platform: http://stackoverflow.com/a/18434831
+
+# NOTE: on OS X, install GNU sed and grep using
+# brew tap homebrew/dupes; brew install gnu-sed grep
+# http://apple.stackexchange.com/a/69332
+
+case "${OSTYPE}" in
+    darwin*)
+        grep='ggrep'
+        sed='gsed'
+        ;;
+    linux*)
+        grep='grep'
+        sed='sed'
+        ;;
+    *)
+        echo "Unsupported operating system: ${OSTYPE}"
+        exit -1
+        ;;
+esac
+
+
+# -----------------------------------------------------------------------------
 # process command line arguments
 
 if [ $# -ne 1 ]
@@ -94,13 +117,20 @@ pushd "${repo_root}" > /dev/null
 #
 
 release_name="$(git log -1 --pretty=%B            \
-                    | ggrep -E "${message_regex}" \
-                    | gsed -r -e "s|${message_regex}|\1|g")"
+                    | "${grep}" -E "${message_regex}" \
+                    | "${sed}" -r -e "s|${message_regex}|\1|g")"
 
 if [ -z "${release_name}" ]
 then
     echo "Failed to determine name of current release"
     exit -1
+fi
+
+# TODO: see dd-upload-artifacts
+if [ "$(hostname)" = 'vm-build-nice' ]
+then
+    # shellcheck disable=SC2034
+    SSH_AUTH_SOCK='/home/bob.the.builder/.ssh/ssh_auth_sock'
 fi
 
 # NOTE: tag name is equal to release name by git flow convention

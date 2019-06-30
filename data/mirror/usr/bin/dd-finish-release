@@ -72,8 +72,33 @@ fi
 # absolute path to the root folder of the repository to process
 repo_root="$(realpath "$1")"
 
+# name of default git repo remote
+default_remote_name='origin'
+
+# name of branch for next release development;
+# 'develop' as per git flow convention
+develop_branch='develop'
+
+# regular expression to match branch name for
+# next release development in 'git branch' output
+local_develop_regex="^[ |*] ${develop_branch}$"
+
+# same as above, but for remote branches
+remote_develop_regex="^  ${default_remote_name}/${develop_branch}$"
+
+# name of branch for production releases;
+# 'master' as per git flow convention
+master_branch='master'
+
 # release branch prefix; 'release' as per git flow convention
 rel_prefix='release'
+
+# regular expression to match branch name for
+# production releases in 'git branch' output
+local_master_regex="^[ |*] ${master_branch}$"
+
+# same as above, but for remote branches
+remote_master_regex="^  ${default_remote_name}/${master_branch}$"
 
 # message for creating release tag
 # TODO: add project and release names ?
@@ -82,6 +107,10 @@ rel_prefix='release'
 # https://github.com/nvie/gitflow/issues/98
 # TODO: does this also occur on on Linux ?
 tag_message='automatically_created_release_tag'
+
+# the message of an expectable and recoverable error
+err_msg_git_flow_init='Fatal: Not a gitflow-enabled repo yet. ' \
+err_msg_git_flow_init+="Please run 'git flow init' first."
 
 
 # NOTE: pushd / popd require bash
@@ -102,7 +131,14 @@ then
     exit -1
 fi
 
-echo "Finish release ${release_name} in ${repo_root}:"
+# TODO: see dd-upload-artifacts
+if [ "$(hostname)" = 'vm-build-nice' ]
+then
+    # shellcheck disable=SC2034
+    SSH_AUTH_SOCK='/home/bob.the.builder/.ssh/ssh_auth_sock'
+fi
+
+echo -n "Finish release ${release_name} in ${repo_root}: "
 
 # http://stackoverflow.com/q/14531243
 # https://github.com/nvie/gitflow/pull/287
@@ -110,6 +146,18 @@ echo "Finish release ${release_name} in ${repo_root}:"
 # TODO: store value before setting it; restore after use
 export GIT_MERGE_AUTOEDIT=no
 # echo "GIT_MERGE_AUTOEDIT: ${GIT_MERGE_AUTOEDIT}"
+
+# TODO: this occurred while heavily debugging this on vm-build-nice;
+# not sure if it will occur again during regular operations:
+# dd-finish-release:
+#
+# Finish release 2016.24.04 in /tmp/workspace/TTTest_publish_ssc:
+# [: 1: Illegal number: -master
+# Branches 'master' and 'origin/master' have diverged.
+# And local branch 'master' is ahead of 'origin/master'.
+# Branches 'develop' and 'origin/develop' have diverged.
+# And local branch 'develop' is ahead of 'origin/develop'.
+# Fatal: Tag already exists and does not point to release branch 'release/2016.24.04'
 
 # TODO: on OS X, getopt fails if options such as the tag message contain spaces:
 #   flags:FATAL the available getopt does not support spaces in options
@@ -133,8 +181,105 @@ export GIT_MERGE_AUTOEDIT=no
 #  -m essage -- automatically_created_release_tag 2016.21
 # flags:FATAL unable to parse provided options with getopt.
 
-git flow release finish -m "${tag_message}" "${release_name}"
-res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+# TODO: investigate and recover from or prepare for
+# master and origin/master having diverged
+
+output=$(git flow release finish -m "${tag_message}" "${release_name}" 2>&1)
+
+res="$?"
+
+# NOTE: there isn't really a need to use a while loop here;
+# this is just done for consistency with dd-start-release
+
+recovered=false
+
+while [ "${res}" -ne 0 ]
+do
+    recovered=true
+    echo
+
+    case "${output}" in
+
+        "${err_msg_git_flow_init}")
+
+            # NOTE: see dd-start-release for more information
+
+            echo "Not a gitflow-enabled repo yet, need to run 'git flow init'."
+            echo "Verify preconditions for unattended 'git flow init' execution:"
+            echo
+
+            local_branches="$(git branch)"
+
+            echo -n "Production release branch (${master_branch}): "
+
+            if echo "${local_branches}" | grep -q "${local_master_regex}"
+            then
+                echo 'OK'
+            else
+                echo 'not found'
+                echo 'Attempt to check it out from default remote:'
+                remote_branches="$(git branch -r)"
+
+                if echo "${remote_branches}" | grep -q "${remote_master_regex}"
+                then
+                    echo "git checkout ${master_branch}"
+                    git checkout "${master_branch}"
+                    res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+                    echo
+                else
+                    echo "Failed to obtain ${master_branch} from ${default_remote_name}"
+                    exit -1
+                fi
+            fi
+
+            echo -n "Next release development branch (${develop_branch}): "
+
+            if echo "${local_branches}" | grep -q "${local_develop_regex}"
+            then
+                echo 'OK'
+                echo
+            else
+                echo 'not found'
+                echo 'Attempt to check it out from default remote:'
+                remote_branches="$(git branch -r)"
+
+                if echo "${remote_branches}" | grep -q "${remote_develop_regex}"
+                then
+                    echo "git checkout ${develop_branch}"
+                    git checkout "${develop_branch}"
+                    res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+                    echo
+                else
+                    echo "Failed to obtain ${develop_branch} from ${default_remote_name}"
+                    exit -1
+                fi
+            fi
+
+            echo "Preconditions verified; run 'git flow init':"
+
+            git flow init -d
+            res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+
+            echo
+            echo "Again, finish release ${release_name} in ${repo_root}:"
+
+            output=$(git flow release finish -m "${tag_message}" "${release_name}" 2>&1)
+            res="$?"
+
+            ;;
+
+        *)
+            # git flow release finish prints its own error messages
+            echo "${output}"
+            popd > /dev/null
+            exit "${res}"
+    esac
+done
+
+if [ "${recovered}" = false ]
+then
+    echo 'OK'
+fi
 
 export GIT_MERGE_AUTOEDIT=
 
