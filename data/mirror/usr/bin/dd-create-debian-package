@@ -76,17 +76,36 @@ script_name="$(basename "$0")"
 # on OS X, use grealpath: http://apple.stackexchange.com/a/88812
 repo_root="$(realpath "$1")"
 
-# get name of target project from repository root
-project_name="$(basename "${repo_root}")"
+# name of the root folder of the repository to process; usually corresponds
+# to project name during development, but is arbitrary on CI build slave
+root_folder_name="$(basename "${repo_root}")"
 
-# package 'base' name is project name in lower case
+# absolute path to target project configuration
+project_conf="${repo_root}/project.json"
+
+# get name of target project from configuration
+project_name="$(jq -r '.Project' "${project_conf}")"
+
+# for single-package projects, package name is project name in lower case;
+# for multi-package projects, package names are determined further below
 package_name="$(echo "${project_name}" | tr '[:upper:]' '[:lower:]')"
 
+# if there is a folder with this name in the repo root,
+# the project is considered a multi-package project
+packages_folder_name='packages'
+
+# TODO: for a proper out-of-tree build, any files created as part of the build
+# should be located in e.g. ${repo_root}/../Temp; unfortunately, Jenkins fails
+# to support that, so need to use ${repo_root}/tmp instead - disappointing! :-(
+
 # path to temporary working folder, relative to target project root
-working_folder="../Temp/${project_name}/${script_name}"
+# TODO: this 'tmp' should stay in sync with 'tmp/artifacts' setting
+# for 'Artifacts.packages' from project.json configuration file
+working_folder="tmp/${script_name}"
 
 # path from working folder back to target project root
-path_from_working_folder_to_project_root="../../../${project_name}"
+# TODO: this obviously depends on ${working_folder} on should be calculated
+path_from_working_folder_to_project_root="../.."
 
 
 # -----------------------------------------------------------------------------
@@ -126,14 +145,15 @@ cmake -D skip-cfgserver=TRUE -D skip-nmeator=TRUE \
 
 make -j5
 
-# TODO: distinguish single vs. multi-package projects
-
-if [[ "${project_name}" == 'ChronicServer' ]]
+if [[ -d "${repo_root}/${packages_folder_name}" ]]
 then
     # this works with ChronicServer
-    for package_path in $(find "${repo_root}/packages" -maxdepth 1 -mindepth 1 -type d | sort)
+    for package_path in $(find "${repo_root}/${packages_folder_name}" \
+                            -maxdepth 1 -mindepth 1 -type d | sort)
     do
         package_name=$(basename "${package_path}")
+        # TODO: this prevents a cmake message;
+        # get packages to skip from elsewhere
         if [ "${package_name}" == 'cfgserver' ] || [ "${package_name}" == 'nmeator' ]
         then
             continue
