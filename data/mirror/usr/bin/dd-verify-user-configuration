@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+
+# dd-verify-user-configuration
+#
+# verify git configuration for current user
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-06-16
+
+
+# -----------------------------------------------------------------------------
+# process command line arguments
+
+if [ $# -ne 1 ]
+then
+    echo "Usage: $(basename "$0") <repository root folder>"
+    exit -1
+else
+    if [ ! -e "$1" ]
+    then
+        echo "$1: No such file or directory"
+        exit -1
+    fi
+    if [ ! -d "$1" ]
+    then
+        echo "$1: Not a directory"
+        exit -1
+    fi
+fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to the root folder of the repository to process
+repo_root="$(realpath "$1")"
+
+# TODO: establish email address convention:
+# email_regex='[a-z\.]@desmodyne.com'
+
+# message displayed to user if verification fails
+# NOTE: space between << and 'EOT' messes up atom syntax highlighting
+read -r -d '' error_message <<'EOT'
+Your name and / or email address do not seem to be configured correctly;
+please set them up by adapting the commands below and retry. While you're
+at it, you also might want to set your password to be cached for 24 hours:
+
+    git config --global user.name "Your Name"
+    git config --global user.email you@example.com
+    git config --global credential.helper "cache --timeout=86400"
+EOT
+
+# map username to real name and email address
+declare -A user_details
+
+# NOTE: bash fails to support this: cannot assign list to array member
+# user_details["bob.the.builder"]=("Bob the Builder" "bob.the.builder@desmodyne.com")
+
+user_details["bob.the.builder"]='Bob the Builder:bob.the.builder@desmodyne.com'
+
+
+# NOTE: pushd / popd require bash
+pushd "${repo_root}" > /dev/null
+
+
+# -----------------------------------------------------------------------------
+# verify user configuration
+
+echo -n "Verify user configuration: "
+
+if [ ! -z "$(git config user.name)" ] && [ ! -z "$(git config user.email)" ]
+then
+    echo 'OK'
+else
+    echo 'incomplete'
+    
+    current_username="$(id -u -n)"
+
+    # set details for known users automatically
+    current_user_details="${user_details[${current_username}]}"
+
+    if [ -z "${current_user_details}" ]
+    then
+        echo "${error_message}"
+        echo
+        popd > /dev/null
+        exit -1
+    else
+        username="$(echo "${current_user_details}" | cut -d : -f 1)"
+        email="$(   echo "${current_user_details}" | cut -d : -f 2)"
+
+        echo "Configure settings for known user ${current_username} automatically:"
+
+        echo "git config user.name ${username}"
+        git config user.name "${username}"
+        res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+
+        echo "git config user.email ${email}"
+        git config user.email "${email}"
+        res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+    fi
+fi
+
+
+popd > /dev/null

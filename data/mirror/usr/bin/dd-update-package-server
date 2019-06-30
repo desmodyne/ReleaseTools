@@ -101,9 +101,9 @@ fi
 # determine git branch to determine distribution channel
 git_branch=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
 
-if [[ "${git_branch}" != 'develop' &&
-      "${git_branch}" !=  feature* &&
-      "${git_branch}" != 'master'  &&
+if [[ "${git_branch}" != 'develop' && \
+      "${git_branch}" !=  feature* && \
+      "${git_branch}" != 'master'  && \
       "${git_branch}" !=  release* ]]
 then
     echo "Unsupported git branch / distribution channel ${git_branch}"
@@ -126,6 +126,7 @@ fi
 
 ssh_cmd_line="dd-update-package-index ${distribution} " \
 ssh_cmd_line+="${architecture} ${distribution_channel}"
+# shellcheck disable=SC2029
 ssh "${server_name}" "${ssh_cmd_line}"
 
 # -----------------------------------------------------------------------------
@@ -133,4 +134,5 @@ ssh "${server_name}" "${ssh_cmd_line}"
 
 ssh_cmd_line="dd-update-release-signature ${distribution} " \
 ssh_cmd_line+="${architecture} ${distribution_channel}"
+# shellcheck disable=SC2029
 ssh "${server_name}" "${ssh_cmd_line}" < "${passphrase_file}"

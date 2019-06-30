@@ -47,9 +47,6 @@ develop_branch='develop'
 # master branch; 'master' as per git flow convention
 master_branch='master'
 
-# release branch prefix; 'release' as per git flow convention
-rel_prefix='release'
-
 # name of the release, follows YYYY.CW pattern; as a release is created to
 # publish the efforts of the past week, the calender week is that of last week
 release_name="$(date +"%Y").$(( $(date +"%V") - 1))"
@@ -124,17 +121,21 @@ then
     exit "${res}"
 fi
 
-echo "Delete release branch ${rel_prefix}/${release_name} on origin:"
-git push origin --delete "${rel_prefix}/${release_name}"
-
-res="$?"
-
-if [ "${res}" -ne 0 ]
-then
-    # git push prints its own error messages
-    popd > /dev/null
-    exit "${res}"
-fi
+# TODO: as of git flow 1.8.0-1 Debian package on Debian 8.4 64-bit,
+# this seems no longer required, the remote release branch is already
+# deleted by git flow release finish --> delete only if exists (?)
+#
+# echo "Delete release branch ${rel_prefix}/${release_name} on origin:"
+# git push origin --delete "${rel_prefix}/${release_name}"
+#
+# res="$?"
+#
+# if [ "${res}" -ne 0 ]
+# then
+#     # git push prints its own error messages
+#     popd > /dev/null
+#     exit "${res}"
+# fi
 
 
 popd > /dev/null
