@@ -78,61 +78,71 @@ then
 fi
 
 # name of target project
-project_name="$(jq -r '.Project' "${project_conf}")"
+project_name="$(  jq -r '.Project'             "${project_conf}")"
 
-# package output folder, relative to target project root
-package_folder="$(jq -r '.Artifacts.packages' "${project_conf}")"
+# mirror folder with scripts to install, relative to target project root
+# TODO: review this approach, make it more generic
+mirror_folder="$( jq -r '.Paths.mirror_folder' "${project_conf}")"
+
+# package output folder, relative to target project root;
+# this is where the finished package will be stored for scripts that follow
+package_folder="$(jq -r '.Artifacts.packages'  "${project_conf}")"
 
 # major minor patch project / package version
-major_version="$(jq -r '.Version.major' "${project_conf}")"
-minor_version="$(jq -r '.Version.minor' "${project_conf}")"
-patch_version="$(jq -r '.Version.patch' "${project_conf}")"
+major_version="$( jq -r '.Version.major'       "${project_conf}")"
+minor_version="$( jq -r '.Version.minor'       "${project_conf}")"
+patch_version="$( jq -r '.Version.patch'       "${project_conf}")"
 
-# git archive format; see git archive --list for supported formats
-archive_format='tar.gz'
+
+# package name is project name in lower case and camel case
+# amended by dashes, e.g. ReleaseTools --> release-tools:
+# https://github.com/Homebrew/brew/blob/master/ ...
+#  ... docs/Formula-Cookbook.md#a-quick-word-on-naming
+# https://stackoverflow.com/a/10218742
+# https://stackoverflow.com/a/10757348
+package_name="$( echo "${project_name::1}" | tr '[:upper:]' '[:lower:]')"
+package_name+="$(echo "${project_name:1}"  | sed -e 's|\([A-Z]\)|-\1|g' \
+                                           | tr '[:upper:]' '[:lower:]')"
 
 # brew package version
 version="${major_version}.${minor_version}.${patch_version}"
 
-# archive file name
+# git archive format; see git archive --list for supported formats
+archive_format='tar.gz'
+
+# archive file name: package name plus version and archive format
 #
-# TODO: git archives downloaded from gitlab.com follow a different path
-# and file naming convention than archives used by public brew packages:
+# sample brew package archive names:
+# alexa:~ ansible$ ls -lA ~/Library/Caches/Homebrew \
+#   | grep -v sierra.bottle | show-a-few-interesting-ones
+# -rw-r--r--   1 ansible  staff     141708 May 19  2017 ack-2.18.18-single-file
+# -rw-r--r--   1 ansible  staff     140976 Jan  4 05:10 ack-2.22.22-single-file
+# -rw-r--r--   1 ansible  staff    4877980 Dec 25 19:06 doxygen-1.8.14.tar.gz
+# -rw-r--r--   1 ansible  staff    8442832 Sep  5 23:43 gammaray-2.8.1.tar.gz
+# -rw-r--r--   1 ansible  staff    8438766 Feb  1 16:07 gammaray-2.8.2.tar.gz
+# -rw-r--r--   1 ansible  staff    9662773 Feb  8 17:32 gammaray-2.9.0.tar.gz
+# -rw-r--r--   1 ansible  staff   12495628 Dec 17  2016 python-2.7.13.tar.xz
+# -rw-r--r--   1 ansible  staff   12576112 Sep 16 20:01 python-2.7.14.tar.xz
+# -rw-r--r--   1 ansible  staff  408346584 Dec  5 08:31 qt-5.10.0.tar.xz
+# -rw-r--r--   1 ansible  staff   11437264 Dec 23 08:17 rabbitmq-3.7.2.tar.xz
+# -rw-r--r--   1 ansible  staff   11444792 Jan 30 12:02 rabbitmq-3.7.3.tar.xz
+# -rw-r--r--   1 ansible  staff    2016749 Jan 29 08:52 yaml-cpp-0.5.3.tar.gz
+# -rw-r--r--   1 ansible  staff    1396262 Feb  4 14:52 yaml-cpp-0.6.1.tar.gz
 #
-# gitlab.com archives, e.g.
-#   https://gitlab.com/DesmoDyne/Tools/ ...
-#    ... ReleaseTools/repository/0.2.0/archive.tar.gz
-# have the project name, tag (?) and commit hash prepended as root folder, e.g.
-#   ReleaseTools-0.2.0-81322dd3abf277ec69cfac481beeb0b0d81306c1
-#
-# brew package archives, e.g.
-#   /Users/ansible/Library/Caches/Homebrew/ ...
-#    ... sqlite-3.20.1.el_capitan.bottle.tar.gz
-# have package name and version prepended as root folders, e.g. sqlite/3.20.1/
-#
-# brew renames a downloaded gitlab.com archive including any suffixes, e.g.
+# NOTE: brew renames downloaded archives including any suffixes, e.g.
 #   https://gitlab.com/DesmoDyne/Tools/ ...
 #    ... ReleaseTools/repository/archive.tar.gz?ref=0.2.1&private_token=<snip>
 # to match its own convention, e.g.
 #   /Users/ansible/Library/Caches/Homebrew/ ...
 #    ... release-tools-0.2.1.1&private_token=<snip>
 #
-# in order for the archive sha256 checksum rendered into the brew package
-# formula by dd-create-brew-package-formula to be correct, the gitlab.com
-# archive root folder must be reproduced when creating a local package
-#
-# TODO: the archive checksum is not identical to that for gitlab archive !!
-# TODO: private gitlab.com token is exposed as part of the archive filename
 # TODO: this must be in sync with dd-create-brew-package
 # (and possibly others) --> get this from elsewhere (?)
-#
-archive_name="archive.${archive_format}"
+archive_name="${package_name}-${version}.${archive_format}"
 
-# git branch of target project
-git_branch="$(git -C "${repo_root}" rev-parse --symbolic-full-name \
-                                              --abbrev-ref HEAD)"
-# git SHA-1 sum of current commit
-git_commit="$(git -C "${repo_root}" rev-parse --verify HEAD)"
+# package build folder, relative to target project root;
+# this is a temporary folder with copies of files that go into the package
+pkg_bld_folder="$(jq -r '.Paths.package_build_folder' "${project_conf}")"
 
 
 # -----------------------------------------------------------------------------
@@ -140,35 +150,70 @@ git_commit="$(git -C "${repo_root}" rev-parse --verify HEAD)"
 
 
 # change to target project root directory
-pushd "${repo_root}" > /dev/null
+if ! pushd "${repo_root}" > /dev/null
+then
+    echo "Failed to pushd to repository root ${repo_root}"
+    exit 1
+fi
 
 
 # delete files OS X keeps creating so they are not added to the package;
 # this occurs with project spaces shared between OSs, e.g. using sshfs
-# TODO: is this really required ? git archive knows its files...
+# TODO: is this really required ? use dd-clean for that ?!?
 find . \( -iname '._*' -or -iname '.DS_Store' \) -delete
 
-# remove and (re-) create temporary working folder
+# remove and (re-) create package build and output folders
+
+if [ -d "${pkg_bld_folder}" ]
+then
+    rm -r "${pkg_bld_folder}"
+fi
+
+mkdir -p "${pkg_bld_folder}"
+
 if [ -d "${package_folder}" ]
 then
     rm -r "${package_folder}"
 fi
+
 mkdir -p "${package_folder}"
 
 
-prefix="${project_name}-${version}-${git_commit}"
+if ! cp -a "${mirror_folder}" "${pkg_bld_folder}/"
+then
+    echo "Failed to copy ${mirror_folder} to ${pkg_bld_folder}/"
+    exit 1
+fi
 
-echo "Create archive ${repo_root}/${package_folder}/${archive_name}"
-# https://git-scm.com/docs/git-archive
-git archive --format="${archive_format}"                  \
-            --output="${package_folder}/${archive_name}"  \
-            --prefix="${prefix}/"                         \
-            "${git_branch}"
-res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+# change to package build directory
+if ! pushd "${pkg_bld_folder}" > /dev/null
+then
+    echo "Failed to pushd to package build directory ${pkg_bld_folder}"
+    exit 1
+fi
+
+# TODO: support other archive formats
+# TODO: review paths
+if ! tar -czf "${repo_root}/${package_folder}/${archive_name}" .
+then
+    echo "Failed to create package archive"
+    exit 1
+fi
+
+# change back to previous location
+if ! popd > /dev/null
+then
+    echo "Failed to popd from package build directory ${pkg_bld_folder}"
+    exit 1
+fi
 
 
 # change back to previous location
-popd > /dev/null
+if ! popd > /dev/null
+then
+    echo "Failed to popd from repository root ${repo_root}"
+    exit 1
+fi
 
 
 echo
