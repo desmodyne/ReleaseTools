@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+# dd-create-package
+#
+# create brew package on OS X and Debian package on Debian or Ubuntu
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-07-10
+
+
+echo
+echo 'dd-create-package:'
+# echo
+
+
+# -----------------------------------------------------------------------------
+# determine platform: http://stackoverflow.com/a/18434831
+
+# pass on any command line arguments:
+# http://stackoverflow.com/q/12314451
+
+case "${OSTYPE}" in
+    darwin*)
+        dd-create-brew-package "$@"
+        res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+        dd-create-brew-package-formula "$@"
+        res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+        ;;
+    linux*)
+        dd-create-debian-package "$@"
+        res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+        ;;
+    *)
+        echo "Unsupported operating system: ${OSTYPE}"
+        exit -1
+        ;;
+esac
+
+
+# echo
+echo "dd-create-package: success"
+echo

@@ -1,0 +1,213 @@
+#!/usr/bin/env bash
+
+# dd-create-brew-package-formula
+#
+# create brew package formula
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-07-10
+
+
+echo
+echo 'dd-create-brew-package-formula:'
+echo
+
+# -----------------------------------------------------------------------------
+# determine platform: http://stackoverflow.com/a/18434831
+
+# NOTE: technically, brew packages can be built on Linux as much as on OS X;
+# restricting execution platforms to OS X here keeps things a lot simpler:
+# if this runs on OS X only, we will not encounter both brew and Debian packages
+
+case "${OSTYPE}" in
+    darwin*)
+        # http://stackoverflow.com/a/12405621
+        :
+        ;;
+    *)
+        echo "Unsupported operating system: ${OSTYPE}"
+        exit -1
+        ;;
+esac
+
+
+# -----------------------------------------------------------------------------
+# process command line arguments
+
+if [ $# -ne 1 ]
+then
+    echo "Usage: $(basename "$0") <repository root folder>"
+    exit -1
+else
+    if [ ! -e "$1" ]
+    then
+        echo "$1: No such file or directory"
+        exit -1
+    fi
+    if [ ! -d "$1" ]
+    then
+        echo "$1: Not a directory"
+        exit -1
+    fi
+fi
+
+
+# TODO: error handling; access project config file only once
+# TODO: prevent processing repo this file is in during development ?
+# TODO: verify required executables are available before using them ?
+# TODO: script return value when run as Jenkins job ?!?
+# TODO: major conf effort to get archive name; any better way ?
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to the root folder of the repository to process
+# on Debian, install realpath using e.g. aptitude install realpath
+# on OS X, use grealpath: http://apple.stackexchange.com/a/88812
+repo_root="$(realpath "$1")"
+
+# absolute path to target project configuration
+project_conf="${repo_root}/project.json"
+
+# name of target project
+project_name="$(jq -r '.Project' "${project_conf}")"
+
+# package output folder, relative to target project root
+package_folder="$(jq -r '.Artifacts.packages' "${project_conf}")"
+
+# package name is project name in lower case
+package_name="$(echo "${project_name}" | tr '[:upper:]' '[:lower:]')"
+
+# major minor patch project / package version
+major_version="$(jq -r '.Version.major' "${project_conf}")"
+minor_version="$(jq -r '.Version.minor' "${project_conf}")"
+patch_version="$(jq -r '.Version.patch' "${project_conf}")"
+
+# git archive format; see git archive --list for supported formats
+archive_format='tar.gz'
+
+# brew package version
+version="${major_version}.${minor_version}.${patch_version}"
+
+# archive file name
+archive_name="${package_name}.${version}.${archive_format}"
+
+# brew formula template folder, relative to target project root
+formula_tmpl_folder='data/tmpl'
+
+# brew formula template file name
+formula_tmpl_name="${package_name}.rb.j2"
+
+# brew formula folder, relative to target project root
+formula_folder='tmp/formula'
+
+# brew formula file name
+formula_name="${package_name}.rb"
+
+# git branch of target project
+git_branch=$(git -C "${repo_root}" rev-parse --symbolic-full-name --abbrev-ref HEAD)
+
+if [[ "${git_branch}" != 'develop' && \
+      "${git_branch}" !=  feature* && \
+      "${git_branch}" != 'master'  && \
+      "${git_branch}" !=  release* ]]
+then
+    echo "Unsupported git branch / distribution channel ${git_branch}"
+    exit -1
+fi
+
+if   [[ "${git_branch}" ==  'develop' ]]
+then
+    # shellcheck disable=SC2034
+    distribution_channel='develop'
+elif [[ "${git_branch}" ==   feature* ]]
+then
+    # shellcheck disable=SC2034
+    distribution_channel='feature'
+elif [[ "${git_branch}" ==  'master'  ]]
+then
+    # shellcheck disable=SC2034
+    distribution_channel='master'
+elif [[ "${git_branch}" ==   release* ]]
+then
+    # shellcheck disable=SC2034
+    distribution_channel='release'
+fi
+
+# credentials used to access protected section of update server
+# TODO: get these from elsewhere or better, use SSH key instead
+username='flw'
+password='Ei4!hcxL'
+
+# packages / update server hostname
+hostname='packages.desmodyne.com'
+
+# path on server to brew packages folder
+server_path="protected/osx/dists/${distribution_channel}"
+
+# full brew package download url
+url="http://${username}:${password}@${hostname}/${server_path}/${archive_name}"
+
+# template json data string template
+read -r -d '' tmpl_data_tmpl <<'EOT'
+{
+    "sha256"  : "%s",
+    "url"     : "%s",
+    "version" : "%s"
+}
+EOT
+
+# absolute path to Python virtual environment activation script
+path_to_virt_env_script="${HOME}/.virtualenvs/dd/bin/activate"
+
+
+# -----------------------------------------------------------------------------
+# create brew package formula
+
+
+# change to target project root directory
+pushd "${repo_root}" > /dev/null
+
+
+# NOTE: the brew package formula is created here by rendering a template
+# provided by the target project; staging it in the brew formula git repo and
+# committing and pushing the change is considered equivalent to updating a
+# Debian package server index and is done in dd-update-formula-repo
+
+# remove and (re-) create formula folder
+if [ -d "${formula_folder}" ]
+then
+    rm -r "${formula_folder}"
+fi
+mkdir -p "${formula_folder}"
+
+# calculate SHA256 checksum, required for brew formula
+sha256="$(shasum -a 256 "${package_folder}/${archive_name}" | cut -d ' ' -f 1)"
+
+# shellcheck disable=SC2059
+tmpl_data="$(printf "${tmpl_data_tmpl}" "${sha256}" "${url}" "${version}")"
+
+formula_path="${formula_folder}/${formula_name}"
+formula_tmpl="${formula_tmpl_folder}/${formula_tmpl_name}"
+
+# switch to virtual Python environment; required to use j2
+# https://github.com/koalaman/shellcheck/wiki/SC1090
+# shellcheck source=${HOME}/.virtualenvs/dd/bin/activate
+source "${path_to_virt_env_script}"
+
+echo "Create formula $(realpath "${repo_root}/${formula_path}")"
+echo "${tmpl_data}" | j2 --format=json "${formula_tmpl}" > "${formula_path}"
+
+# leave virtual Python environment
+deactivate
+
+
+# change back to previous location
+popd > /dev/null
+
+
+echo
+echo "dd-create-brew-package-formula: success"
+echo

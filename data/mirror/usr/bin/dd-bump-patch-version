@@ -26,11 +26,11 @@ echo
 
 case "${OSTYPE}" in
     darwin*)
-        grep='ggrep'
+        # grep='ggrep'
         sed='gsed'
         ;;
     linux*)
-        grep='grep'
+        # grep='grep'
         sed='sed'
         ;;
     *)
@@ -66,15 +66,14 @@ fi
 # absolute path to root folder of repository to process
 repo_root="$(realpath "$1")"
 
-# path to multi-package project configuration
-# root folder, relative to root of target project
-path_to_multi_proj_root="packages"
-
 # path to project configuration file, relative to root of target project
-path_to_proj_conf="build/CMakeLists.txt"
+path_to_proj_conf='project.json'
+
+# regular expression pattern template for multiple lines defining patch version
+multi_line_patch_regex_tmpl='("%s"[^p]*"patch" : ")([0-9]+)(")'
 
 # regular expression pattern for line defining patch version
-patch_regex='(set\(CPACK_PACKAGE_VERSION_PATCH\s+")([0-9]+)("\))'
+patch_regex='(    "patch" : ")([0-9]+)(")'
 
 # message for committing changes to project configuration file
 # TODO: add project and release names ?
@@ -82,129 +81,167 @@ commit_message='[#1]: bump patch version'
 
 
 # -----------------------------------------------------------------------------
-# declare functions
-
-function bump_patch_version
-{
-    project_config="$1"
-
-    # verify project configuration exists before accessing it
-    if [ ! -f "${project_config}" ]
-    then
-        echo "Failed to find project configuration file: ${project_config}"
-        return 1
-    fi
-
-    # TODO: verify this works with relative paths passed as cmd line argument
-    # TODO: prevent processing conf of this project during development ?
-    # TODO: verify required executables are available before using them ?
-    # TODO: script return value when run as Jenkins job ?!?
-
-    # get line with current patch version
-    patch_line=$("${grep}" -E "${patch_regex}" "${project_config}")
-
-    if [ -z "${patch_line}" ]
-    then
-        echo "Failed to find line with package version patch"
-        return 1
-    fi
-
-    # get current patch version number and increment it
-    patch_version="$(echo "${patch_line}" | "${sed}" -r -e "s|${patch_regex}|\2|g")"
-
-    if [ -z "${patch_version}" ]
-    then
-        echo "Failed to get package version patch number from line ${patch_line}"
-        return 1
-    fi
-
-    patch_version=$((patch_version+1))
-
-    # replace current with new patch version
-    "${sed}" -i -r -e "s|${patch_regex}|\1${patch_version}\3|g" "${project_config}"
-
-    res="$?"
-
-    if [ "${res}" -ne 0 ]
-    then
-        echo "Failed to replace current with new patch version in line ${patch_line}"
-        # TODO: (here and below):
-        # https://github.com/koalaman/shellcheck/wiki/SC2152
-        return "${res}"
-    fi
-
-    # add changes to git repository
-    # TODO: error handling ? get log output ?
-
-    # git prints its own error messages
-    git add "${project_config}"
-    res="$?"; if [ "${res}" -ne 0 ]; then return "${res}"; fi
-}
+# bump patch version
 
 
 # NOTE: pushd / popd require bash
 pushd "${repo_root}" > /dev/null
 
 
-# -----------------------------------------------------------------------------
-# bump patch version
+project_config="${repo_root}/${path_to_proj_conf}"
+
+echo "Bump patch version in ${project_config}"
+
+# verify project configuration exists before accessing it
+if [ ! -f "${project_config}" ]
+then
+    echo "Failed to find project configuration file: ${project_config}"
+    popd > /dev/null
+    exit -1
+fi
+
+# TODO: verify this works with relative paths passed as cmd line argument
+# TODO: prevent processing conf of this project during development ?
+# TODO: verify required executables are available before using them ?
+# TODO: script return value when run as Jenkins job ?!?
+# TODO: refactor this to remove code duplication
+# TODO: access project config file only once
 
 error_flag=false
 
-if [ -d "${path_to_multi_proj_root}" ]
+if [ "$(jq '.Version.major' "${project_config}")" = 'null' ] &&
+   [ "$(jq '.Version.minor' "${project_config}")" = 'null' ] &&
+   [ "$(jq '.Version.patch' "${project_config}")" = 'null' ]
 then
-    multi_proj_root="${repo_root}/${path_to_multi_proj_root}"
 
-    echo "Multi-package project: ${multi_proj_root}"
-    echo
+    # multi-package project
 
-    pushd "${multi_proj_root}" > /dev/null
-    for folder in $(find . -maxdepth 1 -mindepth 1 -type d | sed "s|^\./||")
+    # TODO: plausibility check against .../packages/* ?
+    # TODO: package names in project.json use _, folder names use -
+    package_names="$(jq -r '.Version | keys []' "${project_config}")"
+
+    for package_name in ${package_names}
     do
-        project_conf="${multi_proj_root}/${folder}/${path_to_proj_conf}"
+        # get current patch version number and increment it
+        patch_version="$(jq -r ".Version.${package_name}.patch" \
+                               "${project_config}")"
 
-        echo "Bump patch version in ${project_conf}"
-        bump_patch_version "${project_conf}"
+        res="$?"
 
-        if [ "$?" -ne 0 ]
+        # TODO: if [ -z "${patch_version}" ] ?
+
+        if [ "${res}" -ne 0 ]
         then
+            message="Failed to get package version patch number from "
+            message+=".Version.${package_name}.patch JSON attribute in "
+            message+="project configuration file ${project_config}"
+            echo "${message}"
+            error_flag=true
+            continue
+        fi
+
+        patch_version=$((patch_version + 1))
+
+        # replace current with new patch version
+        # shellcheck disable=SC2059
+        patch_regex="$(printf "${multi_line_patch_regex_tmpl}" \
+                              "${package_name}")"
+
+        # http://unix.stackexchange.com/a/152389 <--- !!!
+        # NOTE: it doesn't seem possible to modify the JSON file
+        # in place; see also http://stackoverflow.com/a/24943373
+        # NOTE: see also: http://unix.stackexchange.com/a/204378
+        # shellcheck disable=SC2002
+        json_data="$(cat "${project_config}" \
+          | tr '\n' '\r'                     \
+          | "${sed}" -r -e "s|${patch_regex}|\1${patch_version}\3|g" \
+          | tr '\r' '\n')"
+
+        # TODO: review error handling
+        if [ -z "${json_data}" ]
+        then
+            message="Failed to replace current with new patch version in "
+            message+="project configuration file ${project_config}"
+            echo "${message}"
+            error_flag=true
+            continue
+        fi
+
+        echo "${json_data}" > "${project_config}"
+    done
+
+else
+
+    # single-package project
+
+    # maintain the same structure as for multi-package
+    # project to allow for combined error handling
+    # shellcheck disable=SC2041
+    for package_name in 'dummy'
+    do
+        # get current patch version number and increment it
+        patch_version="$(jq -r '.Version.patch' "${project_config}")"
+
+        res="$?"
+
+        # TODO: if [ -z "${patch_version}" ] ?
+        # TODO: maintain error return value ?
+
+        if [ "${res}" -ne 0 ]
+        then
+            message="Failed to get package version patch number from "
+            message+=".Version.patch JSON attribute in "
+            message+="project configuration file ${project_config}"
+            echo "${message}"
+            error_flag=true
+            continue
+        fi
+
+        patch_version=$((patch_version + 1))
+
+        # replace current with new patch version
+        # TODO: using jq would be a lot simpler, but jq chooses to re-format file
+        # in an arbitrary style and there seems to be now way to configure that :-(
+        # json_data="$(jq ".Version.patch = \"${patch_version}\"" "${project_config}")"
+        # echo "${json_data}" > "${project_config}"
+        "${sed}" -i -r -e "s|${patch_regex}|\1${patch_version}\3|g" \
+                          "${project_config}"
+
+        res="$?"
+
+        if [ "${res}" -ne 0 ]
+        then
+            message="Failed to replace current with new patch version in "
+            message+="project configuration file ${project_config}"
+            echo "${message}"
             error_flag=true
             continue
         fi
     done
-    popd > /dev/null
-
-    echo
-
-    if [ "${error_flag}" = true ]
-    then
-        message="Not all package patch versions were bumped successfully; "
-        message+="please review log output above and fix before proceeding"
-        echo "${message}"
-        popd > /dev/null
-        exit -1
-    fi
-else
-    project_conf="${repo_root}/${path_to_proj_conf}"
-
-    echo "Bump patch version in ${project_conf}"
-    bump_patch_version "${project_conf}"
-
-    res="$?"
-
-    if [ "${res}" -ne 0 ]
-    then
-        popd > /dev/null
-        exit "${res}"
-    fi
 fi
 
-
-if [ "${error_flag}" = false ]
+if [ "${error_flag}" = true ]
 then
-    git commit --message "${commit_message}"
-    res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+    message="Not all package patch versions were bumped successfully; "
+    message+="please review log output above and fix before proceeding"
+    echo "${message}"
+    popd > /dev/null
+    exit -1
 fi
+
+# add changes to git repository
+# TODO: error handling ? get log output ?
+
+# git prints its own error messages
+
+echo -n 'Stage changes: '
+git add "${project_config}"
+res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+echo 'OK'
+
+echo 'Commit changes:'
+git commit --message "${commit_message}"
+res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 
 
 popd > /dev/null

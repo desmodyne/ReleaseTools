@@ -10,6 +10,25 @@
 
 
 # -----------------------------------------------------------------------------
+# determine platform: http://stackoverflow.com/a/18434831
+
+case "${OSTYPE}" in
+    darwin*)
+        do_update_formula_repo=true
+        do_update_package_server=false
+        ;;
+    linux*)
+        do_update_formula_repo=false
+        do_update_package_server=true
+        ;;
+    *)
+        echo "Unsupported operating system: ${OSTYPE}"
+        exit -1
+        ;;
+esac
+
+
+# -----------------------------------------------------------------------------
 # process command line arguments
 
 if [ $# -ne 1 ]
@@ -37,8 +56,11 @@ fi
 repo_root="$(realpath "$1")"
 
 # list of tools called by this script
-req_tools='dd-verify-user-configuration dd-upload-artifacts '
-req_tools+='dd-update-package-server'
+# NOTE: as long as all these scripts belong to ReleaseTools, there is no need
+# to assemble this list in an OS-dependent manner; ReleaseTools scripts will
+# either be available as a whole or not at all, no matter what OS we're on
+req_tools='dd-update-formula-repo dd-update-package-server '
+req_tools+='dd-upload-artifacts dd-verify-user-configuration'
 
 # absolute path to this script: http://stackoverflow.com/a/9107028
 path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -85,10 +107,27 @@ fi
 # TODO: this must not be done mindlessly, but only after (manual) test
 # and approval, so there should at least be a warning when this is run
 
+# NOTE: as an alternate approach, a brew formula could be considered an artifact
+# and be "uploaded" to the brew formula repo by dd-upload-artifacts; the actions
+# required for those tasks are really different though and putting both into
+# the same script would impurify that script's purpose and make it really large
+
+if [ "${do_update_formula_repo}" = true ]
+then
+    dd-verify-user-configuration "${repo_root}"
+    res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+
+    dd-update-formula-repo "${repo_root}"
+    res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+fi
+
 dd-upload-artifacts "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 
 # TODO: should this really be done here ?
 
-dd-update-package-server "${repo_root}"
-res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+if [ "${do_update_package_server}" = true ]
+then
+    dd-update-package-server "${repo_root}"
+    res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+fi

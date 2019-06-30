@@ -21,5 +21,5 @@ path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # -----------------------------------------------------------------------------
 # build this project
 
-dd-create-debian-package "${path_to_this_script}"
+dd-create-package "${path_to_this_script}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
