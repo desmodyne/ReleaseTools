@@ -23,8 +23,7 @@ echo
 
 case "${OSTYPE}" in
     darwin*)
-        # http://stackoverflow.com/a/12405621
-        :
+        sed='gsed'
         ;;
     *)
         echo "Unsupported operating system: ${OSTYPE}"
@@ -123,6 +122,13 @@ path_to_formula_repo_root='Homebrew/Tools'
 #  ... How-to-Create-and-Maintain-a-Tap.md#creating-a-tap
 path_to_formula_folder='Formula'
 
+# regex for version entry in formula
+version_regex='version "\d\+\.\d\+\.\d\+"'
+
+# sed expression for version entry in formula
+version_sedex='s|[[:space:]]*version[[:space:]]\+'
+version_sedex+='"\([[:digit:]]\+\.[[:digit:]]\+\.[[:digit:]]\+\)"|\1|g'
+
 # message template for committing changes to brew formula
 # TODO: rendered message must not get longer than 72 characters:
 # 123456789012345678901234567890123456789012345678901234567890123456789012
@@ -204,7 +210,7 @@ number_of_source_files="$(echo "${source_file}" | wc -l)"
 if [ "${number_of_source_files}" -eq 0 ]
 then
     echo "Failed to find a brew formula in ${repo_root}/${formula_folder}"
-    popd > /dev/null;
+    popd > /dev/null
     exit -1
 fi
 
@@ -212,7 +218,27 @@ if [ "${number_of_source_files}" -gt 1 ]
 then
     echo "Found more than one brew formula:"
     echo "${source_file}"
-    popd > /dev/null;
+    popd > /dev/null
+    exit -1
+fi
+
+if ! version_line="$(grep "${version_regex}" "${source_file}")"
+then
+    echo "Failed to find version info in formula:"
+    echo "${source_file}"
+    popd > /dev/null
+    exit -1
+fi
+
+formula_version="$(echo "${version_line}" | "${sed}" "${version_sedex}")"
+
+# TODO: also compare against latest git tag ?
+if [ "${formula_version}" != "${version}" ]
+then
+    msg="Version in brew formula ${formula_version} "
+    msg+="does not match project version ${version}"
+    echo "${msg}"
+    popd > /dev/null
     exit -1
 fi
 
