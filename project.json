@@ -1,0 +1,18 @@
+{
+  "File information" :
+  {
+    "Name"          : "project.json",
+    "Description"   : "human- & machine-readable project information",
+    "Author"        : "Stefan Schablowski",
+    "Contact"       : "stefan.schablowski@desmodyne.com",
+    "Created"       : "2016-06-09",
+    "Comment"       : null
+  },
+
+  "Project" : "ReleaseTools",
+
+  "Artifacts" :
+  {
+    "packages" : "../Temp/ReleaseTools/artifacts"
+  }
+}
