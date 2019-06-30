@@ -167,6 +167,12 @@ path_to_proj_conf='project.conf'
 # absolute path to project configuration file
 project_config="${repo_root}/${path_to_proj_conf}"
 
+if [ ! -e "${project_config}" ]
+then
+    echo "Failed to find project configuration ${project_config}"
+    exit 1
+fi
+
 # path to folder with project configuration file, relative to project root
 path_to_proj_conf_folder="$(dirname "${project_config}")"
 

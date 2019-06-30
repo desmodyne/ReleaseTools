@@ -154,7 +154,7 @@ for req_tool in ${req_tools}
 do
     if [ -z "$(which "${req_tool}")" ]
     then
-        echo "${req_tool}: No such file or directory; amending PATH and retry"
+        echo "${req_tool}: No such file or directory; amend PATH and retry"
         PATH="${path_to_this_script}:${PATH}"
         amended_path=true
     fi

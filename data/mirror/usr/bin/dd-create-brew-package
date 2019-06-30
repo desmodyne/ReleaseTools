@@ -71,14 +71,17 @@ repo_root="$(realpath "$1")"
 # absolute path to target project configuration
 project_conf="${repo_root}/project.conf"
 
+if [ ! -e "${project_conf}" ]
+then
+    echo "Failed to find project configuration ${project_conf}"
+    exit 1
+fi
+
 # name of target project
 project_name="$(jq -r '.Project' "${project_conf}")"
 
 # package output folder, relative to target project root
 package_folder="$(jq -r '.Artifacts.packages' "${project_conf}")"
-
-# package name is project name in lower case
-package_name="$(echo "${project_name}" | tr '[:upper:]' '[:lower:]')"
 
 # major minor patch project / package version
 major_version="$(jq -r '.Version.major' "${project_conf}")"
@@ -92,10 +95,44 @@ archive_format='tar.gz'
 version="${major_version}.${minor_version}.${patch_version}"
 
 # archive file name
-archive_name="${package_name}.${version}.${archive_format}"
+#
+# TODO: git archives downloaded from gitlab.com follow a different path
+# and file naming convention than archives used by public brew packages:
+#
+# gitlab.com archives, e.g.
+#   https://gitlab.com/DesmoDyne/Tools/ ...
+#    ... ReleaseTools/repository/0.2.0/archive.tar.gz
+# have the project name, tag (?) and commit hash prepended as root folder, e.g.
+#   ReleaseTools-0.2.0-81322dd3abf277ec69cfac481beeb0b0d81306c1
+#
+# brew package archives, e.g.
+#   /Users/ansible/Library/Caches/Homebrew/ ...
+#    ... sqlite-3.20.1.el_capitan.bottle.tar.gz
+# have package name and version prepended as root folders, e.g. sqlite/3.20.1/
+#
+# brew renames a downloaded gitlab.com archive including any suffixes, e.g.
+#   https://gitlab.com/DesmoDyne/Tools/ ...
+#    ... ReleaseTools/repository/archive.tar.gz?ref=0.2.1&private_token=<snip>
+# to match its own convention, e.g.
+#   /Users/ansible/Library/Caches/Homebrew/ ...
+#    ... release-tools-0.2.1.1&private_token=<snip>
+#
+# in order for the archive sha256 checksum rendered into the brew package
+# formula by dd-create-brew-package-formula to be correct, the gitlab.com
+# archive root folder must be reproduced when creating a local package
+#
+# TODO: the archive checksum is not identical to that for gitlab archive !!
+# TODO: private gitlab.com token is exposed as part of the archive filename
+# TODO: this must be in sync with dd-create-brew-package
+# (and possibly others) --> get this from elsewhere (?)
+#
+archive_name="archive.${archive_format}"
 
 # git branch of target project
-git_branch=$(git -C "${repo_root}" rev-parse --symbolic-full-name --abbrev-ref HEAD)
+git_branch="$(git -C "${repo_root}" rev-parse --symbolic-full-name \
+                                              --abbrev-ref HEAD)"
+# git SHA-1 sum of current commit
+git_commit="$(git -C "${repo_root}" rev-parse --verify HEAD)"
 
 
 # -----------------------------------------------------------------------------
@@ -118,9 +155,14 @@ then
 fi
 mkdir -p "${package_folder}"
 
+
+prefix="${project_name}-${version}-${git_commit}"
+
 echo "Create archive ${repo_root}/${package_folder}/${archive_name}"
-git archive --format="${archive_format}"              \
+# https://git-scm.com/docs/git-archive
+git archive --format="${archive_format}"                  \
             --output="${package_folder}/${archive_name}"  \
+            --prefix="${prefix}/"                         \
             "${git_branch}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 

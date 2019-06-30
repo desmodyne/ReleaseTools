@@ -157,6 +157,12 @@ path_to_proj_conf='project.conf'
 # absolute path to project configuration file
 project_config="${repo_root}/${path_to_proj_conf}"
 
+if [ ! -e "${project_config}" ]
+then
+    echo "Failed to find project configuration ${project_config}"
+    exit 1
+fi
+
 # path to folder with project configuration file, relative to project root
 path_to_proj_conf_folder="$(dirname "${project_config}")"
 
@@ -196,6 +202,8 @@ elif [ "$(jq '.Version.major' "${project_config}")" = 'null' ] &&
 then
     # 'YYYY.CW'
 
+    # TODO: there is all kinds of bugs in here, YYYY.CW should not be used
+
     # name of the release; as a release is created to publish the efforts of
     # the past week, the calender week is that of last week; if a release tag
     # with that name already exists, a new release name is tried out by
@@ -210,10 +218,6 @@ else
     major="$(jq -r '.Version.major' "${project_config}")"
     minor="$(jq -r '.Version.minor' "${project_config}")"
     patch="$(jq -r '.Version.patch' "${project_config}")"
-
-    patch=$((patch + 1))
-
-    canonical_release_name="${major}.${minor}.${patch}"
 fi
 
 
@@ -221,6 +225,7 @@ fi
 # increment the one defined in project > version conf
 if [ -z "${semver}" ]
 then
+    # TODO: BUG - this does not work with YYYY.CW
     patch=$((patch + 1))
     canonical_release_name="${major}.${minor}.${patch}"
 

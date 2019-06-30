@@ -84,6 +84,12 @@ repo_root="$(realpath "$1")"
 # absolute path to target project configuration
 project_conf="${repo_root}/project.conf"
 
+if [ ! -e "${project_conf}" ]
+then
+    echo "Failed to find project configuration ${project_conf}"
+    exit 1
+fi
+
 # get name of target project from configuration
 project_name="$(jq -r '.Project' "${project_conf}")"
 

@@ -71,14 +71,40 @@ repo_root="$(realpath "$1")"
 # absolute path to target project configuration
 project_conf="${repo_root}/project.conf"
 
+if [ ! -e "${project_conf}" ]
+then
+    echo "Failed to find project configuration ${project_conf}"
+    exit 1
+fi
+
 # name of target project
 project_name="$(jq -r '.Project' "${project_conf}")"
 
 # package output folder, relative to target project root
 package_folder="$(jq -r '.Artifacts.packages' "${project_conf}")"
 
-# package name is project name in lower case
-package_name="$(echo "${project_name}" | tr '[:upper:]' '[:lower:]')"
+# TODO: does this download URL support auth alternatives ?
+# https://gitlab.com/api/v3/projects/2113101/repository/ ...
+#  ... archive.tar.gz\?private_token\=<snipped>
+# brew install does not support adding http headers,
+# so private token must be encoded into download url
+# http://stackoverflow.com/a/28361068
+# TODO: the url is visible in eg. ps output, so this represents a security risk
+
+# TODO: is there any way to use this url scheme with a private repo ?
+# https://gitlab.com/gitlab-org/gitlab-ce/issues/19843
+# https://gitlab.com/DesmoDyne/ReleaseTools/repository/archive.tar.gz?ref=0.2.0
+
+# package name is project name in lower case and camel case
+# amended by dashes, e.g. ReleaseTools --> release-tools:
+# https://github.com/Homebrew/brew/blob/master/ ...
+#  ... docs/Formula-Cookbook.md#a-quick-word-on-naming
+# NOTE: this is different from the archive filename
+# https://stackoverflow.com/a/10218742
+# https://stackoverflow.com/a/10757348
+package_name="$( echo "${project_name::1}" | tr '[:upper:]' '[:lower:]')"
+package_name+="$(echo "${project_name:1}"  | sed -e 's|\([A-Z]\)|-\1|g' \
+                                           | tr '[:upper:]' '[:lower:]')"
 
 # major minor patch project / package version
 major_version="$(jq -r '.Version.major' "${project_conf}")"
@@ -92,7 +118,8 @@ archive_format='tar.gz'
 version="${major_version}.${minor_version}.${patch_version}"
 
 # archive file name
-archive_name="${package_name}.${version}.${archive_format}"
+# see also dd-create-brew-package, search for 'archive file name'
+archive_name="archive.${archive_format}"
 
 # brew formula template folder, relative to target project root
 formula_tmpl_folder='data/tmpl'
@@ -105,6 +132,9 @@ formula_folder='tmp/formula'
 
 # brew formula file name
 formula_name="${package_name}.rb"
+
+# TODO: git_branch and distribution_channel are currently not used
+# TODO: the above is not detected by shellcheck
 
 # git branch of target project
 git_branch=$(git -C "${repo_root}" rev-parse --symbolic-full-name --abbrev-ref HEAD)
@@ -136,19 +166,24 @@ then
     distribution_channel='release'
 fi
 
-# credentials used to access protected section of update server
-# TODO: get these from elsewhere or better, use SSH key instead
-username='flw'
-password='Ei4!hcxL'
-
 # packages / update server hostname
-hostname='packages.desmodyne.com'
+hostname='gitlab.com'
 
 # path on server to brew packages folder
-server_path="protected/osx/dists/${distribution_channel}"
+server_path='DesmoDyne/Tools/ReleaseTools/repository'
 
-# full brew package download url
-url="http://${username}:${password}@${hostname}/${server_path}/${archive_name}"
+# TODO: align these:
+
+# full brew package download url as used in formula
+# TODO: protocol - http / https / other
+# TODO: username / password ? SSH key ? other ?
+formula_url="https://${hostname}/${server_path}/${archive_name}"
+formula_url+="?ref=${version}&private_token=#{ENV['GITLAB_HOMEBREW_TOKEN']}"
+
+# full brew package download url as used to download archive
+# TODO: verify GITLAB_HOMEBREW_TOKEN is set before using it
+archive_url="https://${hostname}/${server_path}/${archive_name}"
+archive_url+="?ref=${version}&private_token=${GITLAB_HOMEBREW_TOKEN}"
 
 # template json data string template
 read -r -d '' tmpl_data_tmpl <<'EOT'
@@ -158,9 +193,6 @@ read -r -d '' tmpl_data_tmpl <<'EOT'
     "version" : "%s"
 }
 EOT
-
-# absolute path to Python virtual environment activation script
-path_to_virt_env_script="${HOME}/.virtualenvs/dd/bin/activate"
 
 
 # -----------------------------------------------------------------------------
@@ -183,25 +215,71 @@ then
 fi
 mkdir -p "${formula_folder}"
 
+# remove and (re-) create package folder
+if [ -d "${package_folder}" ]
+then
+    rm -r "${package_folder}"
+fi
+mkdir -p "${package_folder}"
+
+package_path="${package_folder}/${archive_name}"
+
+# download archive to calculate checksum
+if ! output="$(curl --output "${package_path}"  \
+                    --silent                    \
+                    --show-error                \
+                    "${archive_url}")"
+then
+    echo 'Failed to download brew package from'
+    echo "  ${archive_url}:"
+    echo "${output}"
+    exit 1
+fi
+
+# shasum doesn't print usable error messages
+if [ ! -e "${package_path}" ]
+then
+    # from 'man realpath':
+    #   -m, --canonicalize-missing
+    #          no path components need exist or be a directory
+    echo "Failed to find brew package $(realpath -m "${package_path}")"
+    exit 1
+fi
+
 # calculate SHA256 checksum, required for brew formula
-sha256="$(shasum -a 256 "${package_folder}/${archive_name}" | cut -d ' ' -f 1)"
+if ! output="$(shasum -a 256 "${package_path}")"
+then
+    echo 'Failed to calculate SHA256 checksum for brew package:'
+    echo "${output}"
+    popd > /dev/null
+    exit 1
+fi
+
+sha256="$(echo "${output}" | cut -d ' ' -f 1)"
 
 # shellcheck disable=SC2059
-tmpl_data="$(printf "${tmpl_data_tmpl}" "${sha256}" "${url}" "${version}")"
+tmpl_data="$(printf "${tmpl_data_tmpl}" "${sha256}" "${formula_url}" "${version}")"
 
 formula_path="${formula_folder}/${formula_name}"
 formula_tmpl="${formula_tmpl_folder}/${formula_tmpl_name}"
 
-# switch to virtual Python environment; required to use j2
-# https://github.com/koalaman/shellcheck/wiki/SC1090
-# shellcheck source=${HOME}/.virtualenvs/dd/bin/activate
-source "${path_to_virt_env_script}"
+if [ ! -e "${formula_tmpl}" ]
+then
+    echo "Failed to find brew formula template $(realpath -m "${formula_tmpl}")"
+    exit 1
+fi
 
+# TODO: find a way to auto-install j2 Python pip package
 echo "Create formula $(realpath "${repo_root}/${formula_path}")"
-echo "${tmpl_data}" | j2 --format=json "${formula_tmpl}" > "${formula_path}"
-
-# leave virtual Python environment
-deactivate
+if ! output="$(echo "${tmpl_data}"                        \
+                | j2 --format=json "${formula_tmpl}" 2>&1 \
+                > "${formula_path}")"
+then
+    echo 'Failed to render brew formula template:'
+    echo "${output}"
+    popd > /dev/null
+    exit 1
+fi
 
 
 # change back to previous location
