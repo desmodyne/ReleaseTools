@@ -67,17 +67,17 @@ fi
 repo_root="$(realpath "$1")"
 
 # path to project configuration file, relative to root of target project
-path_to_proj_conf='project.json'
+path_to_proj_conf='project.conf'
 
 # regular expression pattern template for multiple lines defining patch version
 multi_line_patch_regex_tmpl='("%s"[^p]*"patch" : ")([0-9]+)(")'
 
 # regular expression pattern for line defining patch version
-patch_regex='(    "patch" : ")([0-9]+)(")'
+patch_regex='([ ]+"patch"[ ]+:[ ]+")([0-9]+)(")'
 
 # message for committing changes to project configuration file
 # TODO: add project and release names ?
-commit_message='[#1]: bump patch version'
+commit_message='#1: bump patch version'
 
 
 # -----------------------------------------------------------------------------
@@ -109,15 +109,43 @@ fi
 
 error_flag=false
 
-if [ "$(jq '.Version.major' "${project_config}")" = 'null' ] &&
-   [ "$(jq '.Version.minor' "${project_config}")" = 'null' ] &&
-   [ "$(jq '.Version.patch' "${project_config}")" = 'null' ]
+# new-style project version information
+
+# TODO: review this
+
+version="$(jq -r '.Version' "${project_config}")"
+
+# resolve file / json element references
+
+if [ "$(echo "${version}" | jq -r '. | keys[]')" = '_include' ]
+then
+    reference="$(echo "${version}" | jq -r '._include')"
+    file_ref="$(echo "${reference}" | cut -d : -f 1)"
+    json_ref="$(echo "${reference}" | cut -d : -f 2)"
+    version="$(jq ".${json_ref}" "${file_ref}")"
+
+    # TODO: this duplicates single-package project code below
+    patch_version="$(echo "${version}" | jq -r '.patch')"
+    patch_version=$((patch_version + 1))
+
+    # absolute path to version configuration file
+    path_to_version_conf="${repo_root}/${file_ref}"
+
+    "${sed}" -i -r -e "s|${patch_regex}|\1${patch_version}\3|g" \
+                      "${path_to_version_conf}"
+
+    target_file="${path_to_version_conf}"
+
+
+elif [ "$(jq '.Version.major' "${project_config}")" = 'null' ] &&
+     [ "$(jq '.Version.minor' "${project_config}")" = 'null' ] &&
+     [ "$(jq '.Version.patch' "${project_config}")" = 'null' ]
 then
 
     # multi-package project
 
     # TODO: plausibility check against .../packages/* ?
-    # TODO: package names in project.json use _, folder names use -
+    # TODO: package names in project.conf use _, folder names use -
     package_names="$(jq -r '.Version | keys []' "${project_config}")"
 
     for package_name in ${package_names}
@@ -170,6 +198,8 @@ then
         echo "${json_data}" > "${project_config}"
     done
 
+    target_file="${project_config}"
+
 else
 
     # single-package project
@@ -218,6 +248,8 @@ else
             continue
         fi
     done
+
+    target_file="${project_config}"
 fi
 
 if [ "${error_flag}" = true ]
@@ -235,7 +267,7 @@ fi
 # git prints its own error messages
 
 echo -n 'Stage changes: '
-git add "${project_config}"
+git add "${target_file}"
 res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 echo 'OK'
 

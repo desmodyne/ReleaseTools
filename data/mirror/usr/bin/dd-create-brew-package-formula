@@ -69,7 +69,7 @@ fi
 repo_root="$(realpath "$1")"
 
 # absolute path to target project configuration
-project_conf="${repo_root}/project.json"
+project_conf="${repo_root}/project.conf"
 
 # name of target project
 project_name="$(jq -r '.Project' "${project_conf}")"

@@ -78,7 +78,7 @@ fi
 repo_root="$(realpath "$1")"
 
 # absolute path to target project configuration
-project_conf="${repo_root}/project.json"
+project_conf="${repo_root}/project.conf"
 
 # absolute path to packages folder
 packages_folder="${repo_root}/$(jq -r '.Artifacts.packages' "${project_conf}")"
