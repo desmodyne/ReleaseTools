@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-# dd-release
+# dd-publish
 #
-# perform a complete software release
+# publish a software release
 #
 # author  : stefan schablowski
 # contact : stefan.schablowski@desmodyne.com
-# created : 2016-06-04
+# created : 2016-06-06
 
 
 # -----------------------------------------------------------------------------
@@ -42,20 +42,13 @@ repo_root="$(realpath "$1")"
 
 # TODO: review error handling (use trap with error function ?)
 # TODO: this assumes the script is called from the folder it is located in
+# TODO: this must not be done mindlessly, but only after (manual) test
+# and approval, so there should at least be a warning when this is run
 
-echo
-./dd-start-release        "${repo_root}"
+./dd-finish-release "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 echo
-./dd-bump-patch-version   "${repo_root}"
-res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
-echo
-./dd-create-release-notes "${repo_root}"
-res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
-echo
-./dd-finish-release       "${repo_root}"
-res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
-echo
-./dd-push-release         "${repo_root}"
+
+./dd-push-finished-release "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 echo

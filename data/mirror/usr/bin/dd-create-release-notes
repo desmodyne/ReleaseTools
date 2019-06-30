@@ -52,6 +52,7 @@ else
     fi
 fi
 
+# TODO: this should be done later, so hotfixes are also mentioned
 # TODO: prevent processing repo this file is in during development ?
 # TODO: verify required executables are available before using them ?
 # TODO: script return value when run as Jenkins job ?!?
