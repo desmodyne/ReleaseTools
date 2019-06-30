@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+
+# dd-finish-release
+#
+# finish a software release
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-06-04
+
+
+# -----------------------------------------------------------------------------
+# process command line arguments
+
+if [ $# -ne 1 ]
+then
+    echo "Usage: $(basename "$0") <repository root folder>"
+    exit -1
+else
+    if [ ! -e "$1" ]
+    then
+        echo "$1: No such file or directory"
+        exit -1
+    fi
+    if [ ! -d "$1" ]
+    then
+        echo "$1: Not a directory"
+        exit -1
+    fi
+fi
+
+# TODO: prevent processing repo this file is in during development ?
+# TODO: verify required executables are available before using them ?
+# TODO: script return value when run as Jenkins job ?!?
+# TODO: add leading zero to calender week in release name
+# TODO: get release name from git branch ? plausibility checks ?
+# TODO: sign the release tag cryptographically ? https://github.com/nvie/ ...
+# gitflow/wiki/Command-Line-Arguments#git-flow-release-finish--fsumpkn-version
+# TODO: do something with the output when script succeeds, e.g.
+# Finishing release 2016.21 in <path to project root>:
+# Switched to branch 'master'
+# Your branch is up-to-date with 'origin/master'.
+# Merge made by the 'recursive' strategy.
+#  build/CMakeLists.txt                                     |  2 +-
+#  doc/txt/Release Notes/20160604 Release Notes 2016.21.txt | 17 +++++++++++++++++
+#  2 files changed, 18 insertions(+), 1 deletion(-)
+#  create mode 100644 doc/txt/Release Notes/20160604 Release Notes 2016.21.txt
+# Switched to branch 'develop'
+# Your branch is up-to-date with 'origin/develop'.
+# Merge made by the 'recursive' strategy.
+#  build/CMakeLists.txt                                     |  2 +-
+#  doc/txt/Release Notes/20160604 Release Notes 2016.21.txt | 17 +++++++++++++++++
+#  2 files changed, 18 insertions(+), 1 deletion(-)
+#  create mode 100644 doc/txt/Release Notes/20160604 Release Notes 2016.21.txt
+# Deleted branch release/2016.21 (was 14cc582).
+#
+# Summary of actions:
+# - Latest objects have been fetched from 'origin'
+# - Release branch has been merged into 'master'
+# - The release was tagged '2016.21'
+# - Release branch has been back-merged into 'develop'
+# - Release branch 'release/2016.21' has been deleted
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to the root folder of the repository to process
+repo_root="$(realpath "$1")"
+
+# name of the release, follows YYYY.CW pattern; as a release is created to
+# publish the efforts of the past week, the calender week is that of last week
+release_name="$(date +"%Y").$(( $(date +"%V") - 1))"
+
+# message for creating release tag
+# TODO: add project and release names ?
+# TODO: on OSX, getopt fails on spaces, even
+# with extra / escaped single / double quotes:
+# https://github.com/nvie/gitflow/issues/98
+# TODO: does this also occur on on Linux ?
+tag_message='automatically_created_release_tag'
+
+
+# NOTE: pushd / popd require bash
+pushd "${repo_root}" > /dev/null
+
+
+# -----------------------------------------------------------------------------
+# finish the release
+
+echo "Finish release ${release_name} in ${repo_root}:"
+
+# http://stackoverflow.com/q/14531243
+# https://github.com/nvie/gitflow/pull/287
+# echo "GIT_MERGE_AUTOEDIT: ${GIT_MERGE_AUTOEDIT}"
+# TODO: store value before setting it; restore after use
+export GIT_MERGE_AUTOEDIT=no
+# echo "GIT_MERGE_AUTOEDIT: ${GIT_MERGE_AUTOEDIT}"
+
+# TODO: on OS X, getopt fails if options such as the tag message contain spaces:
+#   flags:FATAL the available getopt does not support spaces in options
+# workaround does not fix this either: https://github.com/nvie/gitflow/issues/98
+# brew install gnu-getopt
+# FLAGS_GETOPT_CMD: /usr/local/opt/gnu-getopt/bin/getopt
+# alexa:bin ssc$ /usr/local/opt/gnu-getopt/bin/getopt --version
+# getopt (enhanced) 1.1.6
+# alexa:bin ssc$ which getopt
+# /usr/bin/getopt
+# alexa:bin ssc$ /usr/bin/getopt --version
+#  --
+#
+# echo "FLAGS_GETOPT_CMD: ${FLAGS_GETOPT_CMD}"
+# export FLAGS_GETOPT_CMD="$(brew --prefix gnu-getopt)/bin/getopt"
+# echo "FLAGS_GETOPT_CMD: ${FLAGS_GETOPT_CMD}"
+
+# NOTE: in git, -m and --message are equivalent;
+# git flow fails on the long version --message:
+# flags:WARN getopt: illegal option -- -
+#  -m essage -- automatically_created_release_tag 2016.21
+# flags:FATAL unable to parse provided options with getopt.
+
+git flow release finish -m "${tag_message}" "${release_name}"
+res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+
+export GIT_MERGE_AUTOEDIT=
+
+
+popd > /dev/null

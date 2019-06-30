@@ -57,6 +57,7 @@ fi
 # TODO: script return value when run as Jenkins job ?!?
 # TODO: test this with projects that don't have any releases yet
 # TODO: verify most recent release was merged to master ?!?
+# TODO: perform git branch status plausibility checks elsewhere
 
 
 # -----------------------------------------------------------------------------
@@ -81,10 +82,14 @@ output_filename="$(date +"%Y%m%d") Release Notes <release name>.txt"
 commit_message='[#1]: add release notes'
 
 
-# -----------------------------------------------------------------------------
-# change to target project root directory
+# NOTE: pushd / popd require bash
 pushd "${repo_root}" > /dev/null
 
+
+# -----------------------------------------------------------------------------
+# create release notes
+
+echo "Create release notes in ${repo_root}:"
 
 # create output folder if required
 if [ ! -d "${output_folder}" ]
@@ -94,6 +99,13 @@ fi
 
 # verify target project is on a release branch
 current_branch="$(git branch | "${grep}" '^* ' | "${sed}" -e 's|* ||g')"
+
+if [ -z "${current_branch}" ]
+then
+    echo "Failed to determine current branch"
+    popd > /dev/null
+    exit -1
+fi
 
 # http://stackoverflow.com/a/229606
 if [[ "${current_branch}" != *"${rel_prefix}"* ]]
@@ -109,12 +121,22 @@ fi
 # TODO: is there a need to take local release branches into consideration ?
 # if dd-start-release is run with local release branches being present,
 # git flow aborts with a message like for example
-# There is an existing release branch (2016.08.a ...
-#  ... release/2016.20.a release/2016.21.a). Finish that one first.
+#   There is an existing release branch (2016.08.a ...
+#    ... release/2016.20.a release/2016.21.a). Finish that one first.
+# if dd-start-release is run with local release tag being present,
+# git flow aborts with a message like for example
+#   Tag '2016.21' already exists. Pick another name.
 
 latest_branch=$(git branch -a | "${grep}" "${rel_prefix}" \
                     | "${sed}" -r -e "s|^.*${rel_prefix}|${rel_prefix}|g" \
                     | sort | uniq | tail -n 1)
+
+if [ -z "${latest_branch}" ]
+then
+    echo "Failed to determine latest release branch"
+    popd > /dev/null
+    exit -1
+fi
 
 if [[ "${current_branch}" != "${latest_branch}" ]]
 then
@@ -128,7 +150,9 @@ fi
 # get commit SHA1 hashes of previous and this release branch
 # TODO: make master and HEAD configurable ?
 prev_release="$(git rev-parse --verify master)"
+res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 this_release="$(git rev-parse --verify HEAD)"
+res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 
 # https://github.com/koalaman/shellcheck/wiki/SC2001
 current_branch="${current_branch//${rel_prefix}\//}"
@@ -141,14 +165,16 @@ output_filename="${output_filename//<release name>/${current_branch}}"
 git rev-list --topo-order --format=fuller \
    "${prev_release}".."${this_release}"   \
  > "${output_folder}/${output_filename}"
+ res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 
 
- # add and commit changes to git repository
- # TODO: error handling ? get log output ?
+# add and commit changes to git repository
+# TODO: error handling ? get log output ?
 
- git add "${output_folder}/${output_filename}"
-
- git commit --message "${commit_message}"
+git add "${output_folder}/${output_filename}"
+res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+git commit --message "${commit_message}"
+res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 
 
 popd > /dev/null

@@ -62,11 +62,24 @@ repo_root="$(realpath "$1")"
 release_name="$(date +"%Y").$(( $(date +"%V") - 1))"
 
 
+# NOTE: pushd / popd require bash
+pushd "${repo_root}" > /dev/null
+
+
 # -----------------------------------------------------------------------------
 # start the release
 
-# NOTE: pushd / popd require bash
-pushd "${repo_root}" > /dev/null
-echo "Creating release ${release_name} in ${repo_root}:"
+echo "Start release ${release_name} in ${repo_root}:"
 git flow release start "${release_name}"
+
+res="$?"
+
+if [ "${res}" -ne 0 ]
+then
+    # git flow release start prints its own error messages
+    popd > /dev/null
+    exit "${res}"
+fi
+
+
 popd > /dev/null
