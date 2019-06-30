@@ -6,7 +6,7 @@
 # contact : stefan.schablowski@desmodyne.com
 # created : 2016-06-01
 
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 
 function(get_project_setting json_key result)
     execute_process(COMMAND "jq" "-r" ${json_key}
