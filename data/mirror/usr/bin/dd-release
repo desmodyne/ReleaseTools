@@ -55,23 +55,29 @@ path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # to PATH and retry. This does not mix package / production and development
 # versions, either all ReleaseTools scripts are taken from PATH or from local.
 
+amended_path=false
+
 for req_tool in ${req_tools}
 do
     if [ -z "$(which "${req_tool}")" ]
     then
-        echo "${req_tool}: No such file or directory; amend PATH and retry"
+        echo "${req_tool}: No such file or directory; amending PATH and retry"
         PATH="${path_to_this_script}:${PATH}"
-
-        for req_tool in ${req_tools}
-        do
-            if [ -z "$(which "${req_tool}")" ]
-            then
-                echo "${req_tool}: No such file or directory"
-                exit -1
-            fi
-        done
+        amended_path=true
     fi
 done
+
+if [ "${amended_path}" = true ]
+then
+    for req_tool in ${req_tools}
+    do
+        if [ -z "$(which "${req_tool}")" ]
+        then
+            echo "${req_tool}: No such file or directory"
+            exit -1
+        fi
+    done
+fi
 
 
 # -----------------------------------------------------------------------------
@@ -79,15 +85,11 @@ done
 
 # TODO: review error handling (use trap with error function ?)
 
-echo
-
 dd-verify-user-configuration "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
-echo
 
 dd-start-release "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
-echo
 
 # TODO: get this to work with Chronic Server:
 # https://gitlab.com/DesmoDyne/Projects/Chronic/ChronicServer/issues/28
@@ -96,18 +98,16 @@ if [[ "${repo_root}" == *'ChronicServer' ]]
 then
     message="Project in ${repo_root} does not provide a project "
     message+="configuration file; skipping patch version bumping"
+    # TODO: review output / align with other sections
     echo "${message}"
     echo
 else
     dd-bump-patch-version "${repo_root}"
     res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
-    echo
 fi
 
 dd-create-release-notes "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
-echo
 
 dd-push-release-branch "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
-echo

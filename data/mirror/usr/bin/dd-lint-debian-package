@@ -9,6 +9,10 @@
 # created : 2016-06-08
 
 
+echo
+echo 'dd-lint-debian-package:'
+echo
+
 # -----------------------------------------------------------------------------
 # determine platform: http://stackoverflow.com/a/18434831
 
@@ -99,7 +103,11 @@ packages_folder="$(realpath "${packages_folder}")"
 # TODO: review path and glob
 for package_filename in "${packages_folder}"/*.deb
 do
-    echo
     echo "lintian ${package_filename}:"
     lintian "${package_filename}"
 done
+
+
+echo
+echo 'dd-lint-debian-package: success'
+echo

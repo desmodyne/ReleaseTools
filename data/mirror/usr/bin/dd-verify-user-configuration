@@ -9,6 +9,10 @@
 # created : 2016-06-16
 
 
+echo
+echo 'dd-verify-user-configuration:'
+echo
+
 # -----------------------------------------------------------------------------
 # process command line arguments
 
@@ -57,6 +61,7 @@ declare -A user_details
 # NOTE: bash fails to support this: cannot assign list to array member
 # user_details["bob.the.builder"]=("Bob the Builder" "bob.the.builder@desmodyne.com")
 
+# shellcheck disable=SC2154
 user_details["bob.the.builder"]='Bob the Builder:bob.the.builder@desmodyne.com'
 
 
@@ -67,14 +72,14 @@ pushd "${repo_root}" > /dev/null
 # -----------------------------------------------------------------------------
 # verify user configuration
 
-echo -n "Verify user configuration: "
+echo -n "Verify user git configuration: "
 
 if [ ! -z "$(git config user.name)" ] && [ ! -z "$(git config user.email)" ]
 then
     echo 'OK'
 else
     echo 'incomplete'
-    
+
     current_username="$(id -u -n)"
 
     # set details for known users automatically
@@ -104,3 +109,8 @@ fi
 
 
 popd > /dev/null
+
+
+echo
+echo 'dd-verify-user-configuration: success'
+echo

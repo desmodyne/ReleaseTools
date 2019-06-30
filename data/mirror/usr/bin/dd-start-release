@@ -9,6 +9,10 @@
 # created : 2016-06-01
 
 
+echo
+echo 'dd-start-release:'
+echo
+
 # -----------------------------------------------------------------------------
 # process command line arguments
 
@@ -82,11 +86,29 @@ local_master_regex="^[ |*] ${master_branch}$"
 remote_master_regex="^  ${default_remote_name}/${master_branch}$"
 
 # name of the release, follows YYYY.CW pattern; as a release is created to
-# publish the efforts of the past week, the calender week is that of last week
-release_name="$(date +"%Y").$(( $(date +"%V") - 1))"
+# publish the efforts of the past week, the calender week is that of last week;
+# if a release tag with that name already exists; a new release name is tried
+# by appending .01, .02, .03, etc. until one that doesn't exist is found
+# TODO: this is calculated this way several times and should come from elsewhere
+canonical_release_name="$(date +"%Y").$(( $(date +"%V") - 1))"
 
-# one error message that might occur and should be dealt with
-err_msg="Fatal: Not a gitflow-enabled repo yet. Please run 'git flow init' first."
+# TODO: document for the team that under OSX, git-flow-avh must be installed,
+# not git-flow; the latter causes this script to fail due to one stupid bug:
+#
+# message on Linux, 1.8.0 (AVH Edition) installed using aptitude install git-flow:
+#   Fatal: Not a gitflow-enabled repo yet. Please run 'git flow init' first.
+# message on OSX, version 0.4.1, installed using brew install git-flow:
+#   fatal: Not a gitflow-enabled repo yet. Please run "git flow init" first.
+# message on OSX, 1.9.1 (AVH Edition), installed using brew install git-flow-avh:
+#   fatal: Not a gitflow-enabled repo yet. Please run "git flow init" first.
+
+# the message of an expectable and recoverable error
+err_msg_git_flow_init='Fatal: Not a gitflow-enabled repo yet. ' \
+err_msg_git_flow_init+="Please run 'git flow init' first."
+
+# template for the message of another expectable and recoverable error
+err_msg_tag_already_exists_tmpl="Fatal: Tag '%s' already exists. " \
+err_msg_tag_already_exists_tmpl+='Pick another name.'
 
 
 # NOTE: pushd / popd require bash
@@ -96,6 +118,8 @@ pushd "${repo_root}" > /dev/null
 # -----------------------------------------------------------------------------
 # start the release
 
+release_name="${canonical_release_name}"
+
 echo "Start release ${release_name} in ${repo_root}:"
 # this assumes git prints to either stdout or stderr,
 # but not both - and sets a corresponding return value
@@ -103,124 +127,162 @@ output=$(git flow release start "${release_name}" 2>&1)
 
 res="$?"
 
-if [ "${res}" -eq 0 ]
-then
-    echo "${output}"
-else
-    if [ "${output}" != "${err_msg}" ]
-    then
-        # git flow release start prints its own error messages
-        echo "${output}"
-        popd > /dev/null
-        exit "${res}"
-    else
-        # NOTE: git flow init requires local develop and master branches to be
-        # present locally to auto-select them for fully unattended execution
+while [ "${res}" -ne 0 ]
+do
+    # shellcheck disable=SC2059
+    err_msg_tag_already_exists="$(printf "${err_msg_tag_already_exists_tmpl}" \
+                                         "${release_name}")"
 
-        # TODO: the above does not seem to be the case for a brand new repo:
-        # ssc@vm-build-debian-stable-ssc:~$ cd /tmp
-        # ssc@vm-build-debian-stable-ssc:/tmp$ mkdir test
-        # ssc@vm-build-debian-stable-ssc:/tmp$ cd test
-        # ssc@vm-build-debian-stable-ssc:/tmp/test$ git init
-        # Initialized empty Git repository in /tmp/test/.git/
-        # ssc@vm-build-debian-stable-ssc:/tmp/test$ git flow init -d
-        # Using default branch names.
-        # No branches exist yet. Base branches must be created now.
-        # Branch name for production releases: [master]
-        # Branch name for "next release" development: [develop]
-        #
-        # How to name your supporting branch prefixes?
-        # Feature branches? [feature/]
-        # Release branches? [release/]
-        # Hotfix branches? [hotfix/]
-        # Support branches? [support/]
-        # Version tag prefix? []
-        # Hooks and filters directory? [/tmp/test/.git/hooks]
+    case "${output}" in
 
-        echo "Not a gitflow-enabled repo yet, need to run 'git flow init'."
-        echo "Verify preconditions for unattended 'git flow init' execution:"
-        echo
+        "${err_msg_git_flow_init}")
 
-        local_branches="$(git branch)"
+            # NOTE: git flow init requires local develop and master branches to be
+            # present locally to auto-select them for fully unattended execution
 
-        # TODO: remove this
-        # printf "local_branches:\n%s\n" "${local_branches}"
+            # TODO: the above does not seem to be the case for a brand new repo:
+            # ssc@vm-build-debian-stable-ssc:~$ cd /tmp
+            # ssc@vm-build-debian-stable-ssc:/tmp$ mkdir test
+            # ssc@vm-build-debian-stable-ssc:/tmp$ cd test
+            # ssc@vm-build-debian-stable-ssc:/tmp/test$ git init
+            # Initialized empty Git repository in /tmp/test/.git/
+            # ssc@vm-build-debian-stable-ssc:/tmp/test$ git flow init -d
+            # Using default branch names.
+            # No branches exist yet. Base branches must be created now.
+            # Branch name for production releases: [master]
+            # Branch name for "next release" development: [develop]
+            #
+            # How to name your supporting branch prefixes?
+            # Feature branches? [feature/]
+            # Release branches? [release/]
+            # Hotfix branches? [hotfix/]
+            # Support branches? [support/]
+            # Version tag prefix? []
+            # Hooks and filters directory? [/tmp/test/.git/hooks]
 
-        # NOTE: bash regex doesn't seem to support matching
-        # line ends within a multi-line search string:
-        # if [[ "${local_branches}" =~ "${local_master_regex}" ]]
-
-        echo -n "Production release branch (${master_branch}): "
-
-        # https://github.com/koalaman/shellcheck/wiki/SC2143
-        if echo "${local_branches}" | grep -q "${local_master_regex}"
-        then
-            echo 'OK'
-        else
-            echo 'not found'
-            echo 'Attempt to check it out from default remote:'
-            remote_branches="$(git branch -r)"
-
-            # TODO: remove this
-            # printf "remote_branches:\n%s\n" "${remote_branches}"
-            # echo "remote_master_regex: ${remote_master_regex}"
-
-            # need to test if remote branch exists first in order not to create
-            # a new independent branch or get into a  'detached HEAD' state
-            if echo "${remote_branches}" | grep -q "${remote_master_regex}"
-            then
-                echo "git checkout ${master_branch}"
-                git checkout "${master_branch}"
-                res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
-                echo
-            else
-                echo "Failed to obtain ${master_branch} from ${default_remote_name}"
-                exit -1
-            fi
-        fi
-
-        echo -n "Next release development branch (${develop_branch}): "
-
-        if echo "${local_branches}" | grep -q "${local_develop_regex}"
-        then
-            echo 'OK'
+            echo "Not a gitflow-enabled repo yet, need to run 'git flow init'."
+            echo "Verify preconditions for unattended 'git flow init' execution:"
             echo
-        else
-            echo 'not found'
-            echo 'Attempt to check it out from default remote:'
-            remote_branches="$(git branch -r)"
+
+            local_branches="$(git branch)"
 
             # TODO: remove this
-            # printf "remote_branches:\n%s\n" "${remote_branches}"
-            # echo "remote_develop_regex: ${remote_develop_regex}"
+            # printf "local_branches:\n%s\n" "${local_branches}"
 
-            # need to test if remote branch exists first in order not to create
-            # a new independent branch or get into a  'detached HEAD' state
-            if echo "${remote_branches}" | grep -q "${remote_develop_regex}"
+            # NOTE: bash regex doesn't seem to support matching
+            # line ends within a multi-line search string:
+            # if [[ "${local_branches}" =~ "${local_master_regex}" ]]
+
+            echo -n "Production release branch (${master_branch}): "
+
+            # https://github.com/koalaman/shellcheck/wiki/SC2143
+            if echo "${local_branches}" | grep -q "${local_master_regex}"
             then
-                echo "git checkout ${develop_branch}"
-                git checkout "${develop_branch}"
-                res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+                echo 'OK'
+            else
+                echo 'not found'
+                echo 'Attempt to check it out from default remote:'
+                remote_branches="$(git branch -r)"
+
+                # TODO: remove this
+                # printf "remote_branches:\n%s\n" "${remote_branches}"
+                # echo "remote_master_regex: ${remote_master_regex}"
+
+                # need to test if remote branch exists first in order not to create
+                # a new independent branch or get into a  'detached HEAD' state
+                if echo "${remote_branches}" | grep -q "${remote_master_regex}"
+                then
+                    echo "git checkout ${master_branch}"
+                    git checkout "${master_branch}"
+                    res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+                    echo
+                else
+                    echo "Failed to obtain ${master_branch} from ${default_remote_name}"
+                    exit -1
+                fi
+            fi
+
+            echo -n "Next release development branch (${develop_branch}): "
+
+            if echo "${local_branches}" | grep -q "${local_develop_regex}"
+            then
+                echo 'OK'
                 echo
             else
-                echo "Failed to obtain ${develop_branch} from ${default_remote_name}"
-                exit -1
+                echo 'not found'
+                echo 'Attempt to check it out from default remote:'
+                remote_branches="$(git branch -r)"
+
+                # TODO: remove this
+                # printf "remote_branches:\n%s\n" "${remote_branches}"
+                # echo "remote_develop_regex: ${remote_develop_regex}"
+
+                # need to test if remote branch exists first in order not to create
+                # a new independent branch or get into a  'detached HEAD' state
+                if echo "${remote_branches}" | grep -q "${remote_develop_regex}"
+                then
+                    echo "git checkout ${develop_branch}"
+                    git checkout "${develop_branch}"
+                    res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+                    echo
+                else
+                    echo "Failed to obtain ${develop_branch} from ${default_remote_name}"
+                    exit -1
+                fi
             fi
-        fi
 
-        echo "Preconditions verified; run 'git flow init':"
+            echo "Preconditions verified; run 'git flow init':"
 
-        # -d : use default branch names
-        git flow init -d
-        res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+            # -d : use default branch names
+            git flow init -d
+            res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 
-        echo
-        echo "Again, start release ${release_name} in ${repo_root}:"
+            echo
+            echo "Again, start release ${release_name} in ${repo_root}:"
 
-        git flow release start "${release_name}"
-        res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
-    fi
-fi
+            output=$(git flow release start "${release_name}" 2>&1)
+            res="$?"
+
+            ;;
+
+        "${err_msg_tag_already_exists}")
+
+            message="$(printf "Release tag '%s'" "${release_name}")"
+            message+=' already exists, need to pick another name.'
+            echo "${message}"
+
+            if [ "${release_name}" = "${canonical_release_name}" ]
+            then
+                release_name="${canonical_release_name}.01"
+            else
+                # TODO: this strongly relies on 2016.25.01 pattern
+                counter="$(echo "${release_name}" | cut -d . -f 3)"
+                counter=$((counter+1))
+                release_name="${canonical_release_name}.$(printf "%02d" ${counter})"
+            fi
+
+            echo
+            echo "Start release with new name ${release_name} in ${repo_root}:"
+
+            output=$(git flow release start "${release_name}" 2>&1)
+            res="$?"
+
+            ;;
+
+        *)
+            # git flow release start prints its own error messages
+            echo "${output}"
+            popd > /dev/null
+            exit "${res}"
+    esac
+done
+
+echo "${output}"
 
 
 popd > /dev/null
+
+
+echo
+echo 'dd-start-release: success'
+echo

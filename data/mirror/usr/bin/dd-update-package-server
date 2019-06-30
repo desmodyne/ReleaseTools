@@ -9,6 +9,10 @@
 # created : 2016-06-11
 
 
+echo
+echo 'dd-update-package-server:'
+echo
+
 # -----------------------------------------------------------------------------
 # determine platform: http://stackoverflow.com/a/18434831
 
@@ -68,15 +72,10 @@ fi
 # absolute path to the root folder of the repository to process
 # on Debian, install realpath using e.g. aptitude install realpath
 # on OS X, use grealpath: http://apple.stackexchange.com/a/88812
-# repo_root="$(realpath "$1")"
+repo_root="$(realpath "$1")"
 
 # absolute path to GPG key passphrase file
 passphrase_file="${HOME}/.secrets/package_server_passphrase"
-
-# hostname of remote update server; defined by us
-# NOTE: 'update' server name is defined in DesmoDyne corporate name server
-# NOTE: this assumes access to remote server using SSH key is fully set up
-server_name='update'
 
 # local file with
 # these assume packages being uploaded were built on this host
@@ -99,7 +98,7 @@ else
 fi
 
 # determine git branch to determine distribution channel
-git_branch=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
+git_branch=$(git -C "${repo_root}" rev-parse --symbolic-full-name --abbrev-ref HEAD)
 
 if [[ "${git_branch}" != 'develop' && \
       "${git_branch}" !=  feature* && \
@@ -120,6 +119,30 @@ elif [[ "${git_branch}" ==   release* ]]
     then distribution_channel='release'
 fi
 
+# user with write privileges on distribution channels
+declare -A channel_2_user_map
+
+# shellcheck disable=SC2154
+channel_2_user_map["develop"]="bob.the.builder:id_rsa_bob.the.builder"
+# shellcheck disable=SC2154
+channel_2_user_map["feature"]="dd:id_rsa_desmodyne"
+# shellcheck disable=SC2154
+channel_2_user_map["master"]="bob.the.builder:id_rsa_bob.the.builder"
+# shellcheck disable=SC2154
+channel_2_user_map["release"]="bob.the.builder:id_rsa_bob.the.builder"
+
+user_info="${channel_2_user_map[${distribution_channel}]}"
+
+# name of remote server; defined by us
+# NOTE: 'update' server name is defined in DesmoDyne corporate name server
+remote_server='update'
+
+# name of the user to log in as on the remote server
+remote_user="$(echo "${user_info}" | cut -d : -f 1)"
+
+
+# TODO: do these require the same SSH key work as in dd-upload-artifacts ?
+
 
 # -----------------------------------------------------------------------------
 # update package index on distribution server
@@ -127,7 +150,7 @@ fi
 ssh_cmd_line="dd-update-package-index ${distribution} " \
 ssh_cmd_line+="${architecture} ${distribution_channel}"
 # shellcheck disable=SC2029
-ssh "${server_name}" "${ssh_cmd_line}"
+ssh "${remote_user}@${remote_server}" "${ssh_cmd_line}"
 
 # -----------------------------------------------------------------------------
 # update release signature on distribution server
@@ -135,4 +158,9 @@ ssh "${server_name}" "${ssh_cmd_line}"
 ssh_cmd_line="dd-update-release-signature ${distribution} " \
 ssh_cmd_line+="${architecture} ${distribution_channel}"
 # shellcheck disable=SC2029
-ssh "${server_name}" "${ssh_cmd_line}" < "${passphrase_file}"
+ssh "${remote_user}@${remote_server}" "${ssh_cmd_line}" < "${passphrase_file}"
+
+
+echo
+echo 'dd-update-package-server: success'
+echo

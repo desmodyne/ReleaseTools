@@ -9,6 +9,10 @@
 # created : 2016-06-03
 
 
+echo
+echo 'dd-create-release-notes:'
+echo
+
 # -----------------------------------------------------------------------------
 # determine platform: http://stackoverflow.com/a/18434831
 
@@ -128,9 +132,10 @@ fi
 # git flow aborts with a message like for example
 #   Tag '2016.21' already exists. Pick another name.
 
-latest_branch=$(git branch -a | "${grep}" "${rel_prefix}" \
-                    | "${sed}" -r -e "s|^.*${rel_prefix}|${rel_prefix}|g" \
-                    | sort | uniq | tail -n 1)
+# TODO: there might not be a need to find out the latest release branch;
+# git flow won't start a new release if there is an unfinished on in place
+latest_branch=$(git branch -a | "${grep}" "${rel_prefix}/" \
+                    | "${grep}" -o "${rel_prefix}/.*" | sort | uniq | tail -n 1)
 
 if [ -z "${latest_branch}" ]
 then
@@ -179,3 +184,8 @@ res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 
 
 popd > /dev/null
+
+
+echo
+echo 'dd-create-release-notes: success'
+echo

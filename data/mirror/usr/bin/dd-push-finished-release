@@ -9,6 +9,10 @@
 # created : 2016-06-06
 
 
+echo
+echo 'dd-push-finished-release:'
+echo
+
 # -----------------------------------------------------------------------------
 # process command line arguments
 
@@ -41,15 +45,18 @@ fi
 # absolute path to the root folder of the repository to process
 repo_root="$(realpath "$1")"
 
+# release branch prefix; 'release' as per git flow convention
+# TODO: remove this with the inactive branch deletion below
+# rel_prefix='release'
+
 # develop branch; 'develop' as per git flow convention
 develop_branch='develop'
 
 # master branch; 'master' as per git flow convention
 master_branch='master'
 
-# name of the release, follows YYYY.CW pattern; as a release is created to
-# publish the efforts of the past week, the calender week is that of last week
-release_name="$(date +"%Y").$(( $(date +"%V") - 1))"
+# regex pattern for most recent commit message
+message_regex="^Merge tag '(.*)' into develop"
 
 
 # NOTE: pushd / popd require bash
@@ -74,6 +81,27 @@ pushd "${repo_root}" > /dev/null
 #       git remote add <name> <url>
 #   and then push using the remote name
 #       git push <name>
+
+# name of the release in progress: at this point, the release branch has already
+# been deleted and the best way to determine the name of the release whose
+# changes to push seems to be to look at the most recent git commit message
+
+# http://stackoverflow.com/a/7293026
+# git log -1 --pretty=%B sample output:
+# Merge tag '2016.23.02' into develop
+#
+# automatically_created_release_tag 2016.23.02
+#
+
+release_name="$(git log -1 --pretty=%B            \
+                    | ggrep -E "${message_regex}" \
+                    | gsed -r -e "s|${message_regex}|\1|g")"
+
+if [ -z "${release_name}" ]
+then
+    echo "Failed to determine name of current release"
+    exit -1
+fi
 
 # NOTE: tag name is equal to release name by git flow convention
 echo "Push release tag ${release_name} to origin:"
@@ -139,3 +167,8 @@ fi
 
 
 popd > /dev/null
+
+
+echo
+echo 'dd-push-finished-release: success'
+echo

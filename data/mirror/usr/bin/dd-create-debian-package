@@ -9,6 +9,10 @@
 # created : 2016-06-01
 
 
+echo
+echo 'dd-create-debian-package:'
+echo
+
 # -----------------------------------------------------------------------------
 # determine platform: http://stackoverflow.com/a/18434831
 
@@ -139,6 +143,7 @@ find . \( -iname '._*' -or -iname '.DS_Store' \) -delete
 cmake -D skip-cfgserver=TRUE -D skip-nmeator=TRUE \
       "${path_from_working_folder_to_project_root}/build"
 
+# TODO: make this configurable
 make -j5
 
 if [[ -d "${repo_root}/${packages_folder_name}" ]]
@@ -168,3 +173,8 @@ popd > /dev/null
 
 # change back to previous location
 popd > /dev/null
+
+
+echo
+echo "dd-create-debian-package: success"
+echo
