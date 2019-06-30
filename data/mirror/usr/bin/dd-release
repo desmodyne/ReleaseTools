@@ -10,35 +10,128 @@
 
 
 # -----------------------------------------------------------------------------
+# define functions
+
+# http://stackoverflow.com/a/6212408
+
+function usage
+{
+
+    # TODO: do not use global variables
+    # TODO: space between << and 'EOT' makes a
+    # difference for atom syntax highlighting
+    # TODO: align properly and remove leading space when printing ?
+
+    read -r -d '' msg_tmpl <<'EOT'
+Usage: %s folder [version]
+
+mandatory arguments:
+  folder                project repository root folder
+
+optional arguments:
+  semver                semantic project version to release
+  -?, --help            print this help message
+EOT
+
+    # shellcheck disable=SC2059
+    printf "${msg_tmpl}\n" "${script_name}"
+}
+
+
+# -----------------------------------------------------------------------------
 # process command line arguments
 
-if [ $# -ne 1 ]
+# name of this script: http://stackoverflow.com/q/192319
+script_name="$(basename "$0")"
+
+# http://stackoverflow.com/a/14203146
+while [ $# -gt 0 ]
+do
+    key="$1"
+
+    case "${key}" in
+      # NOTE: must escape -?, seems to act as wildcard otherwise
+      -\?|--help) usage; exit 1 ;;
+
+      *)  if [ -z "${folder}" ]
+          then
+              folder="$1"
+          else
+              if [ -z "${semver}" ]
+              then
+                  semver="$1"
+              else
+                  usage
+                  exit 1
+              fi
+          fi
+    esac
+
+    # move past argument or value
+    shift
+done
+
+
+# folder is a mandatory command line argument
+if [ -z "${folder}" ]
 then
-    echo "Usage: $(basename "$0") <repository root folder>"
-    exit -1
-else
-    if [ ! -e "$1" ]
-    then
-        echo "$1: No such file or directory"
-        exit -1
-    fi
-    if [ ! -d "$1" ]
-    then
-        echo "$1: Not a directory"
-        exit -1
-    fi
+    usage
+    exit 1
 fi
 
 
 # -----------------------------------------------------------------------------
 # configure script parameters
 
+# TODO: review regular expression globally:
+# e.g. \d is a Perlism
+# e.g. [0-9] fails for locales other than C (or Western European)
+# e.g. [[:digit:]] works for all theses cases
+# http://stackoverflow.com/a/26091443
+
+# regular expression that matches a semantic version:
+# MAJOR.MINOR.PATCH versioning: http://semver.org
+# https://en.wikipedia.org/wiki/Software_versioning
+
+# TODO: semver also allows e.g. 1, 2.0, 3.0.* and others
+semver_regex='^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'
+
+
+# -----------------------------------------------------------------------------
+# validate command line arguments
+
+if [ ! -e "${folder}" ]
+then
+    echo "${folder}: No such file or directory"
+    exit 1
+fi
+
+if [ ! -d "${folder}" ]
+then
+    echo "${folder}: Not a directory"
+    exit 1
+fi
+
+if [ -n "${semver}" ]
+then
+
+    if [[ ! "${semver}" =~ ${semver_regex} ]]
+    then
+        echo "${semver}: Invalid semantic version"
+        exit 1
+    fi
+fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont.
+
 # absolute path to the root folder of the repository to process
-repo_root="$(realpath "$1")"
+repo_root="$(realpath "${folder}")"
 
 # list of tools called by this script
 req_tools='dd-verify-user-configuration dd-start-release '
-req_tools+='dd-bump-patch-version dd-create-release-notes '
+req_tools+='dd-update-project-version dd-create-release-notes '
 req_tools+='dd-push-release-branch'
 
 # absolute path to this script: http://stackoverflow.com/a/9107028
@@ -88,10 +181,10 @@ fi
 dd-verify-user-configuration "${repo_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 
-dd-start-release "${repo_root}"
+dd-start-release "${repo_root}" "${semver}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 
-dd-bump-patch-version "${repo_root}"
+dd-update-project-version "${repo_root}" "${semver}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 
 dd-create-release-notes "${repo_root}"
