@@ -75,6 +75,26 @@ path_to_project_root='../../../..'
 # on OS X, use grealpath: http://apple.stackexchange.com/a/88812
 repo_root="$(realpath "$1")"
 
+# absolute path to target project configuration
+project_conf="${repo_root}/project.conf"
+
+if [ ! -e "${project_conf}" ]
+then
+    echo "Failed to find project configuration ${project_conf}"
+    exit 1
+fi
+
+# name of target project
+project_name="$(jq -r '.Project' "${project_conf}")"
+
+# major minor patch project / package version
+major_version="$(jq -r '.Version.major' "${project_conf}")"
+minor_version="$(jq -r '.Version.minor' "${project_conf}")"
+patch_version="$(jq -r '.Version.patch' "${project_conf}")"
+
+# brew package version
+version="${major_version}.${minor_version}.${patch_version}"
+
 # brew formula folder, relative to target project root
 formula_folder='tmp/formula'
 
@@ -83,6 +103,7 @@ formula_glob="*.rb"
 
 # brew formula repo git URL; must use SSH for key-based access
 # TODO: don't hardcode gitlab username; eliminate or get from elsewhere
+# TODO: don't hardcode any of this - get from project conf instead
 formula_repo_url='https://dd-ssc@gitlab.com/DesmoDyne/Homebrew/Tools.git'
 
 # path to brew formula project base, relative to root folder of this project;
@@ -102,10 +123,12 @@ path_to_formula_repo_root='Homebrew/Tools'
 #  ... How-to-Create-and-Maintain-a-Tap.md#creating-a-tap
 path_to_formula_folder='Formula'
 
-# message for committing changes to brew formula
-# TODO: add project and release names ?
-# TODO: add info on what version of what script did the commit ?
-commit_message='[#1]: update brew package formula'
+# message template for committing changes to brew formula
+# TODO: rendered message must not get longer than 72 characters:
+# 123456789012345678901234567890123456789012345678901234567890123456789012
+# sample rendered commit message:
+# [#1]: update formula for DesmoDyne ReleaseTools version 0.2.3
+commit_msg_tmpl='[#1]: update formula for DesmoDyne %s version %s'
 
 # (last line in) git commit response when there are no changes to commit
 git_response='nothing to commit, working directory clean'
@@ -215,6 +238,10 @@ git add "${target_folder}"
 res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
 echo 'OK'
 echo
+
+
+# render commit message template
+commit_message="$(printf "${commit_msg_tmpl}" "${project_name}" "${version}")"
 
 echo 'Commit changes:'
 output="$(git commit --message "${commit_message}")"

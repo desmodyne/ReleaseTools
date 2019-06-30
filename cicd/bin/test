@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# dd-test
+# test
 #
 # test artifacts of this project
 #
@@ -15,11 +15,26 @@
 # absolute path to this script: http://stackoverflow.com/a/9107028
 path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# TODO: verify required executables are available before using them
+# path from this script to project root
+rel_path_to_project_root='../..'
+
+# absolute path to project root
+path_to_project_root="$(realpath \
+                        "${path_to_this_script}/${rel_path_to_project_root}")"
 
 
 # -----------------------------------------------------------------------------
 # test this project
 
-dd-lint-debian-package "${path_to_this_script}"
+# TODO: verify required executables are available before using them
+
+dd-shellcheck "${path_to_project_root}"
 res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+
+# TODO: review this
+case "${OSTYPE}" in
+    linux*)
+        dd-lint-debian-package "${path_to_project_root}"
+        res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+        ;;
+esac

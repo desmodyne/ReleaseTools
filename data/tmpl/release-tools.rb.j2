@@ -61,27 +61,10 @@ class ReleaseTools < Formula
 
   # TODO: find a way to auto-install j2 Python pip package
 
-  # TODO: do this algorithmically ?
-  # TODO: use path_to_mirror_folder or so ?
+  # TODO: is ./ in front of file paths really required ?
   def install
-    bin.install "./data/mirror/usr/bin/dd-create-brew-package"
-    bin.install "./data/mirror/usr/bin/dd-create-brew-package-formula"
-    bin.install "./data/mirror/usr/bin/dd-create-debian-package"
-    bin.install "./data/mirror/usr/bin/dd-create-package"
-    bin.install "./data/mirror/usr/bin/dd-create-release-notes"
-    bin.install "./data/mirror/usr/bin/dd-finish-release"
-    bin.install "./data/mirror/usr/bin/dd-lint-debian-package"
-    bin.install "./data/mirror/usr/bin/dd-publish"
-    bin.install "./data/mirror/usr/bin/dd-push-finished-release"
-    bin.install "./data/mirror/usr/bin/dd-push-release-branch"
-    bin.install "./data/mirror/usr/bin/dd-release"
-    bin.install "./data/mirror/usr/bin/dd-start-release"
-    bin.install "./data/mirror/usr/bin/dd-update-formula-repo"
-    bin.install "./data/mirror/usr/bin/dd-update-package-server"
-    bin.install "./data/mirror/usr/bin/dd-update-project-version"
-    bin.install "./data/mirror/usr/bin/dd-upload"
-    bin.install "./data/mirror/usr/bin/dd-upload-artifacts"
-    bin.install "./data/mirror/usr/bin/dd-verify-user-configuration"
+{% for filename in install %}    bin.install "./{{ filename }}"{% if not loop.last %}
+{% endif %}{% endfor %}
   end
 
   # TODO: test: https://github.com/Homebrew/brew/blob/master/docs/ ...

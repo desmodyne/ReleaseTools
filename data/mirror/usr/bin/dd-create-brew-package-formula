@@ -80,6 +80,9 @@ fi
 # name of target project
 project_name="$(jq -r '.Project' "${project_conf}")"
 
+# mirror folder with scripts to install, relative to target project root
+mirror_folder="$(jq -r '.Paths.mirror_folder' "${project_conf}")"
+
 # package output folder, relative to target project root
 package_folder="$(jq -r '.Artifacts.packages' "${project_conf}")"
 
@@ -121,6 +124,9 @@ version="${major_version}.${minor_version}.${patch_version}"
 # see also dd-create-brew-package, search for 'archive file name'
 archive_name="archive.${archive_format}"
 
+# path to brew package file, relative to target project root
+package_path="${package_folder}/${archive_name}"
+
 # brew formula template folder, relative to target project root
 formula_tmpl_folder='data/tmpl'
 
@@ -132,39 +138,6 @@ formula_folder='tmp/formula'
 
 # brew formula file name
 formula_name="${package_name}.rb"
-
-# TODO: git_branch and distribution_channel are currently not used
-# TODO: the above is not detected by shellcheck
-
-# git branch of target project
-git_branch=$(git -C "${repo_root}" rev-parse --symbolic-full-name --abbrev-ref HEAD)
-
-if [[ "${git_branch}" != 'develop' && \
-      "${git_branch}" !=  feature* && \
-      "${git_branch}" != 'master'  && \
-      "${git_branch}" !=  release* ]]
-then
-    echo "Unsupported git branch / distribution channel ${git_branch}"
-    exit -1
-fi
-
-if   [[ "${git_branch}" ==  'develop' ]]
-then
-    # shellcheck disable=SC2034
-    distribution_channel='develop'
-elif [[ "${git_branch}" ==   feature* ]]
-then
-    # shellcheck disable=SC2034
-    distribution_channel='feature'
-elif [[ "${git_branch}" ==  'master'  ]]
-then
-    # shellcheck disable=SC2034
-    distribution_channel='master'
-elif [[ "${git_branch}" ==   release* ]]
-then
-    # shellcheck disable=SC2034
-    distribution_channel='release'
-fi
 
 # packages / update server hostname
 hostname='gitlab.com'
@@ -188,6 +161,7 @@ archive_url+="?ref=${version}&private_token=${GITLAB_HOMEBREW_TOKEN}"
 # template json data string template
 read -r -d '' tmpl_data_tmpl <<'EOT'
 {
+    "install" : [ %s ],
     "sha256"  : "%s",
     "url"     : "%s",
     "version" : "%s"
@@ -222,7 +196,23 @@ then
 fi
 mkdir -p "${package_folder}"
 
-package_path="${package_folder}/${archive_name}"
+
+# generate install section string
+install=''
+
+# TODO: this probably fails with whitespace in mirror_folder
+for filename in ${mirror_folder}/*
+do
+    # shellcheck disable=SC2059
+    # TODO: printf strips trailing whitespace :-(
+    install+="\"${filename}\","$'\n'
+done
+
+# remove last comma
+# https://stackoverflow.com/a/12390197
+# -n switch to echo is essential for this to work
+install="$(echo -n "${install}" | sed '$s/,$//')"
+
 
 # download archive to calculate checksum
 if ! output="$(curl --output "${package_path}"  \
@@ -258,7 +248,8 @@ fi
 sha256="$(echo "${output}" | cut -d ' ' -f 1)"
 
 # shellcheck disable=SC2059
-tmpl_data="$(printf "${tmpl_data_tmpl}" "${sha256}" "${formula_url}" "${version}")"
+tmpl_data="$(printf "${tmpl_data_tmpl}" \
+                    "${install}" "${sha256}" "${formula_url}" "${version}")"
 
 formula_path="${formula_folder}/${formula_name}"
 formula_tmpl="${formula_tmpl_folder}/${formula_tmpl_name}"
