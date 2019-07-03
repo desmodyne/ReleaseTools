@@ -9,72 +9,118 @@
 # created : 2016-06-16
 
 
-echo
-echo 'dd-verify-user-configuration:'
-echo
+# NOTE: see also ./dd-release
 
-# -----------------------------------------------------------------------------
-# process command line arguments
 
-if [ $# -ne 1 ]
-then
-    echo "Usage: $(basename "$0") <repository root folder>"
-    exit -1
-else
-    if [ ! -e "$1" ]
-    then
-        echo "$1: No such file or directory"
-        exit -1
-    fi
-    if [ ! -d "$1" ]
-    then
-        echo "$1: Not a directory"
-        exit -1
-    fi
-fi
+echo
+echo 'verify git configuration'
+echo
 
 
 # -----------------------------------------------------------------------------
 # configure script parameters
 
-# absolute path to the root folder of the repository to process
-repo_root="$(realpath "$1")"
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# TODO: establish email address convention:
+# path from this script to project root
+path_to_proj_root='../..'
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# path to ReleaseTools library file, relative to project root
+path_to_rt_lib='code/bin/dd-rt-library.sh'
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('git' 'realpath')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=()
+
+
+# -----------------------------------------------------------------------------
+# load BashLib library
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont.
+
+# absolute, canonical path to project root
+path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+
+# absolute, canonical path to ReleaseTools library file
+path_to_rt_lib="${path_to_proj_root}/${path_to_rt_lib}"
+
+
+# -----------------------------------------------------------------------------
+# load ReleaseTools library
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_rt_lib}" 2>&1)"
+then
+    source "${path_to_rt_lib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run ReleaseTools boilerplate functions
+
+if ! get_script_args "${@}"; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont. 2
+
+# absolute, canonical path to the target project / repository root folder
+repo_root="$(realpath "${repo_root}")"
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# TODO: support email address convention:
 # email_regex='[a-z\.]@desmodyne.com'
-
-# message displayed to user if verification fails
-# NOTE: space between << and 'EOT' messes up atom syntax highlighting
-read -r -d '' error_message <<'EOT'
-Your name and / or email address do not seem to be configured correctly;
-please set them up by adapting the commands below and retry. While you're
-at it, you also might want to set your password to be cached for 24 hours:
-
-    git config --global user.name "Your Name"
-    git config --global user.email you@example.com
-    git config --global credential.helper "cache --timeout=86400"
-EOT
 
 # map username to real name and email address
 declare -A user_details
 
-# NOTE: bash fails to support this: cannot assign list to array member
-# user_details["bob.the.builder"]=("Bob the Builder" "bob.the.builder@desmodyne.com")
+# NOTE: bash fails to support arrays of arrays
+# user_details["bob"]=("Bob the Builder" "bob.the.builder@desmodyne.com")
 
-# shellcheck disable=SC2154
-user_details["bob.the.builder"]='Bob the Builder:bob.the.builder@desmodyne.com'
-
-
-# NOTE: pushd / popd require bash
-pushd "${repo_root}" > /dev/null
+user_details['bob']='Bob the Builder:bob.the.builder@desmodyne.com'
 
 
 # -----------------------------------------------------------------------------
 # verify user configuration
 
-echo -n "Verify user git configuration: "
+echo -n 'Verify user git configuration: '
 
-if [ ! -z "$(git config user.name)" ] && [ ! -z "$(git config user.email)" ]
+git_username="$( git -C "${repo_root}" config user.name)"
+git_useremail="$(git -C "${repo_root}" config user.email)"
+
+if [ -n "${git_username}" ] && [ -n "${git_useremail}" ]
 then
     echo 'OK'
 else
@@ -87,30 +133,39 @@ else
 
     if [ -z "${current_user_details}" ]
     then
-        echo "${error_message}"
+        # shellcheck disable=SC2154
+        echo "${error_message_git_conf}"
         echo
-        popd > /dev/null
-        exit -1
+        exit 1
     else
-        username="$(echo "${current_user_details}" | cut -d : -f 1)"
-        email="$(   echo "${current_user_details}" | cut -d : -f 2)"
+        username="$(cut -d : -f 1 <<< "${current_user_details}")"
+        email="$(   cut -d : -f 2 <<< "${current_user_details}")"
 
-        echo "Configure settings for known user ${current_username} automatically:"
+        echo "configure settings for known user ${current_username}:"
 
-        echo "git config user.name \"${username}\""
-        git config user.name "\"${username}\""
-        res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+        echo -n "  git config user.name '${username}': "
+        if output="$(git -C "${repo_root}" config user.name "'${username}'")"
+        then
+            echo 'OK'
+        else
+            echo 'ERROR'
+            echo "    ${output}"
+            exit 1
+        fi
 
-        echo "git config user.email ${email}"
-        git config user.email "${email}"
-        res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+        echo -n "  git config user.email '${email}': "
+        if output="$(git -C "${repo_root}" config user.email "'${email}'")"
+        then
+            echo 'OK'
+        else
+            echo 'ERROR'
+            echo "    ${output}"
+            exit 1
+        fi
     fi
 fi
 
 
-popd > /dev/null
-
-
 echo
-echo 'dd-verify-user-configuration: success'
+echo 'git configuration verification complete'
 echo
