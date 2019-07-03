@@ -34,7 +34,7 @@ path_to_rt_lib='code/bin/dd-rt-library.sh'
 
 # array with alphabetical list of tools called by this script
 # shellcheck disable=SC2034
-req_tools=('git' 'realpath')
+req_tools=('git' 'jq' 'realpath' 'yq')
 
 # array with paths to append to PATH
 # shellcheck disable=SC2034
@@ -96,20 +96,46 @@ if ! get_script_args "${@}"; then exit 1; fi
 # absolute, canonical path to the target project / repository root folder
 repo_root="$(realpath "${repo_root}")"
 
+# absolute path to target project configuration file
+# shellcheck disable=SC2154
+conf_file="${repo_root}/${path_to_target_conf}"
+
 
 # -----------------------------------------------------------------------------
-# configure script parameters
+# load script configuration
 
-# TODO: support email address convention:
-# email_regex='[a-z\.]@desmodyne.com'
+echo
 
-# map username to real name and email address
-declare -A user_details
+echo -n 'Load script configuration file: '
+# shellcheck disable=SC2154
+if output="$(yq read "${conf_file}" --tojson 2>&1)"
+then
+    echo 'OK'
+    config="${output}"
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
 
-# NOTE: bash fails to support arrays of arrays
-# user_details["bob"]=("Bob the Builder" "bob.the.builder@desmodyne.com")
-
-user_details['bob']='Bob the Builder:bob.the.builder@desmodyne.com'
+echo -n 'Extract script configuration attributes: '
+# TODO: remove once more attributes
+# shellcheck disable=SC2043
+for attr in users
+do
+    output="$(jq -r ".${attr}" <<< "${config}")"
+    # https://unix.stackexchange.com/a/68349
+    # https://unix.stackexchange.com/a/41418
+    if [ -n "${output}" ] && [ "${output}" != 'null' ]
+    then
+        declare "${attr}"="${output}"
+    else
+        echo 'ERROR'
+        echo "Failed to get ${attr} attribute from configuration"
+        exit 1
+    fi
+done
+echo 'OK'
 
 
 # -----------------------------------------------------------------------------
@@ -129,17 +155,18 @@ else
     current_username="$(id -u -n)"
 
     # set details for known users automatically
-    current_user_details="${user_details[${current_username}]}"
+    # shellcheck disable=SC2154
+    mapfile -t known_users <<< "$(jq -r 'keys[]' <<< "${users}")"
 
-    if [ -z "${current_user_details}" ]
+    if ! grep -q "${current_username}" <<< "${known_users[*]}"
     then
         # shellcheck disable=SC2154
         echo "${error_message_git_conf}"
         echo
         exit 1
     else
-        username="$(cut -d : -f 1 <<< "${current_user_details}")"
-        email="$(   cut -d : -f 2 <<< "${current_user_details}")"
+        username="$(jq -r ".[\"${current_username}\"].name"  <<< "${users}")"
+        email="$(   jq -r ".[\"${current_username}\"].email" <<< "${users}")"
 
         echo "configure settings for known user ${current_username}:"
 

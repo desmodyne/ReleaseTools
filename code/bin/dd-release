@@ -9,9 +9,6 @@
 # created : 2016-06-04
 
 
-# TODO: get target-specific conf from target project conf (in all scripts)
-
-
 echo
 echo 'create software release'
 echo

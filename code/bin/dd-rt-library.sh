@@ -43,6 +43,10 @@ Omit --global to set the identity only in this repository.
 EOT
 
 
+# path to project configuration file, relative to root of target project
+path_to_target_conf='.releasetools.yaml'
+
+
 # -----------------------------------------------------------------------------
 # define functions: http://stackoverflow.com/a/6212408
 
