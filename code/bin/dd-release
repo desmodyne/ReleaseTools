@@ -107,7 +107,7 @@ if ! get_script_args_opt_arg "${@}"; then exit 1; fi
 
 # shellcheck disable=SC2154
 if ! dd-verify-user-configuration "${repo_root}"; then exit 1; fi
-# if ! dd-start-release "${repo_root}" "${semver}"; then exit 1; fi
+if ! dd-start-release "${repo_root}" "${semver}"; then exit 1; fi
 # if ! dd-update-project-version    "${repo_root}"; then exit 1; fi
 # if ! dd-create-release-notes      "${repo_root}"; then exit 1; fi
 # if ! dd-push-release-branch       "${repo_root}"; then exit 1; fi

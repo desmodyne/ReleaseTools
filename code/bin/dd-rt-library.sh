@@ -12,6 +12,70 @@
 # -----------------------------------------------------------------------------
 # define constants
 
+
+# --------------
+# error messages
+
+# error message displayed if user git configuration verification fails
+# NOTE: this is (somewhat intentionally) identical to git native message
+read -r -d '' err_msg_git_conf << 'EOT'
+
+*** Please tell me who you are.
+
+Run
+
+  git config --global user.email "you@example.com"
+  git config --global user.name "Your Name"
+
+to set your account's default identity.
+Omit --global to set the identity only in this repository.
+EOT
+
+# template for error message displayed when semver argument validation fails
+read -r -d '' err_msg_git_conf << 'EOT'
+version argument %s is not greater than existing version %sdefined in\n  %s
+EOT
+
+# TODO: doc differences between git-flow and git-flow-avh on Linux / macOS:
+#
+# message on Linux, 1.8.0 (AVH Edition) installed using aptitude install git-flow:
+#   Fatal: Not a gitflow-enabled repo yet. Please run 'git flow init' first.
+# message on OSX, version 0.4.1, installed using brew install git-flow:
+#   fatal: Not a gitflow-enabled repo yet. Please run "git flow init" first.
+# message on OSX, 1.9.1 (AVH Edition), installed using brew install git-flow-avh:
+#   fatal: Not a gitflow-enabled repo yet. Please run "git flow init" first.
+
+# the message of an expectable and recoverable error
+read -r -d '' err_msg_git_flow_init << 'EOT'
+Fatal: Not a gitflow-enabled repo yet. Please run 'git flow init' first."
+EOT
+
+
+# ----------------------
+# git flow configuration
+
+# name of default git repo remote
+default_remote_name='origin'
+
+# name of branch for next release development;
+# 'develop' as per git flow convention
+develop_branch='develop'
+
+# name of branch for production releases;
+# 'master' as per git flow convention
+master_branch='master'
+
+
+# --------------------------
+# paths to files and folders
+
+# path to project configuration file, relative to root of target project
+path_to_target_conf='.releasetools.yaml'
+
+
+# -------------------
+# regular expressions
+
 # regular expression that matches a semantic version:
 # MAJOR.MINOR.PATCH versioning: http://semver.org
 # https://en.wikipedia.org/wiki/Software_versioning
@@ -26,25 +90,19 @@
 # TODO: semver also allows e.g. 1, 2.0, 3.0.* and others
 regex_semver='^\([[:digit:]]\+\)\.\([[:digit:]]\+\)\.\([[:digit:]]\+\)$'
 
+# regular expression to match branch name for
+# next release development in 'git branch' output
+regex_local_develop="^[ |*] ${develop_branch}$"
 
-# message displayed if user git configuration verification fails
-# NOTE: this is (somewhat intentionally) identical to git native message
-read -r -d '' error_message_git_conf << 'EOT'
+# same as above, but for remote branches
+regex_remote_develop="^  ${default_remote_name}/${develop_branch}$"
 
-*** Please tell me who you are.
+# regular expression to match branch name for
+# production releases in 'git branch' output
+local_master_regex="^[ |*] ${master_branch}$"
 
-Run
-
-  git config --global user.email "you@example.com"
-  git config --global user.name "Your Name"
-
-to set your account's default identity.
-Omit --global to set the identity only in this repository.
-EOT
-
-
-# path to project configuration file, relative to root of target project
-path_to_target_conf='.releasetools.yaml'
+# same as above, but for remote branches
+remote_master_regex="^  ${default_remote_name}/${master_branch}$"
 
 
 # -----------------------------------------------------------------------------

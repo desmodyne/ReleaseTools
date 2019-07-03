@@ -161,7 +161,7 @@ else
     if ! grep -q "${current_username}" <<< "${known_users[*]}"
     then
         # shellcheck disable=SC2154
-        echo "${error_message_git_conf}"
+        echo "${err_msg_git_conf}"
         echo
         exit 1
     else
