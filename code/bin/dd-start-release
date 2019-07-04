@@ -305,7 +305,7 @@ do
             # shellcheck disable=SC2154
             if ! grep -q "${regex_develop_remote}" <<< "${remote_branches}"
             then
-                msg="Failed to obtain ${branch_develop} "
+                msg="Failed to get ${branch_develop} "
                 msg+="from ${remote_default_name}"
                 echo "${msg}"
                 exit 1

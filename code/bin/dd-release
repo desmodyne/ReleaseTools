@@ -15,6 +15,13 @@
 #  + verify release branch to create does not exist on remote yet
 #  + verify most recent previous release was merged to master
 #  + verify local master tracks remote master and is current
+# TODO: dd-publish must not be done mindlessly, but only after (manual) test
+# and approval, so there should at least be a warning when script is run
+# TODO: sign the release tag cryptographically ? https://github.com/nvie/ ...
+# gitflow/wiki/Command-Line-Arguments#git-flow-release-finish--fsumpkn-version
+# TODO: verify preparations in dd-start-release and dd-finish-release are
+# required and if they are, do them elsewhere - and remove code duplication
+# TODO: before pushing finished release, test if tag exists locally
 
 
 echo

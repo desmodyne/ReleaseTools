@@ -60,9 +60,6 @@ commit_msg_version_tmpl='[#1]: update project version to %s'
 # message template for committing release notes
 commit_msg_release_tmpl='[#1]: add release notes for version %s'
 
-# name of default git repo remote
-remote_default_name='origin'
-
 # name of branch for next release development;
 # 'develop' as per git flow convention
 branch_develop='develop'
@@ -74,6 +71,9 @@ branch_master='master'
 # name prefix of release branch;
 # 'release' as per git flow convention
 branch_release_prefix='release'
+
+# name of default git repo remote
+remote_default_name='origin'
 
 
 # ------------------------------
