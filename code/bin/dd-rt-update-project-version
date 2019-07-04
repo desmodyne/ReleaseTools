@@ -173,9 +173,9 @@ else
         exit 1
     fi
 
-    new_major="$("${gsed}" -e "${sedex_semver_major}" <<< "${semver}")"
-    new_minor="$("${gsed}" -e "${sedex_semver_minor}" <<< "${semver}")"
-    new_patch="$("${gsed}" -e "${sedex_semver_patch}" <<< "${semver}")"
+    new_major="$("${sed}" -e "${sedex_semver_major}" <<< "${semver}")"
+    new_minor="$("${sed}" -e "${sedex_semver_minor}" <<< "${semver}")"
+    new_patch="$("${sed}" -e "${sedex_semver_patch}" <<< "${semver}")"
 fi
 
 release_name="${new_major}.${new_minor}.${new_patch}"
