@@ -119,7 +119,7 @@ if ! dd-verify-user-configuration "${repo_root}"            ; then exit 1; fi
 if ! dd-start-release             "${repo_root}" "${semver}"; then exit 1; fi
 if ! dd-update-project-version    "${repo_root}" "${semver}"; then exit 1; fi
 if ! dd-create-release-notes      "${repo_root}"            ; then exit 1; fi
-# if ! dd-push-release-branch       "${repo_root}"; then exit 1; fi
+if ! dd-push-release-branch       "${repo_root}"            ; then exit 1; fi
 
 
 echo 'software release creation complete'
