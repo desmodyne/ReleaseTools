@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# dd-finish-release
+# dd-rt-finish-release
 #
 # finish a software release
 #
@@ -9,7 +9,7 @@
 # created : 2016-06-04
 
 
-# NOTE: see also ./dd-release
+# NOTE: see also ./dd-rt-release
 
 
 echo
@@ -198,7 +198,7 @@ output=$(git "${git_args[@]}" flow release finish -m "${tag_message}" \
 res="$?"
 
 # NOTE: there isn't really a need to use a while loop here;
-# this is just done for consistency with dd-start-release
+# this is just done for consistency with dd-rt-start-release
 
 # need extra variable to place shellcheck instruction
 # shellcheck disable=SC2154
@@ -210,7 +210,7 @@ do
 
         "${error_message}")
 
-        # NOTE: see dd-start-release for more information
+        # NOTE: see dd-rt-start-release for more information
 
         echo "Not a gitflow-enabled repo yet, need to run 'git flow init'."
         echo "Verify preconditions for unattended 'git flow init' execution:"

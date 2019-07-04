@@ -1,22 +1,19 @@
 #!/usr/bin/env bash
 
-# dd-create-release-notes
+# dd-rt-push-release-branch
 #
-# create release notes
+# push a release branch to remote git repo
 #
 # author  : stefan schablowski
 # contact : stefan.schablowski@desmodyne.com
-# created : 2016-06-03
+# created : 2016-06-06
 
 
-# NOTE: see also ./dd-release
-
-
-# TODO: this should be done later, so hotfixes are also mentioned
+# NOTE: see also ./dd-rt-release
 
 
 echo
-echo 'create release notes'
+echo 'push release branch'
 echo
 
 
@@ -159,80 +156,39 @@ release_name="${major}.${minor}.${patch}"
 
 
 # -----------------------------------------------------------------------------
-# create release notes
+# push the release branch
+
+
+# TODO: create script to verify these prerequisites and run earlier than here
+
+# NOTE: this script expects to be called in the following context:
+# dd-rt-release has started a release, updated the project version and created
+# release notes; the target repo is on the release branch and there are no
+# tags yet; only the release branch needs to be pushed to origin
+
+# TODO: deal with improperly set up remotes not using 'origin':
+# git flow heavily relies on that convention:
+#   fatal: No configured push destination.
+#   Either specify the URL from the command-line or configure a remote repository using
+#       git remote add <name> <url>
+#   and then push using the remote name
+#       git push <name>
+
 
 echo
-echo "Create notes for release ${release_name} in ${repo_root}:"
 
-# create output folder if required
-if [ ! -d "${path_to_release_notes}" ]
-then
-    mkdir -p "${path_to_release_notes}"
-fi
+# NOTE: 'git push' alone fails with e.g.
+# fatal: The current branch release/2016.22 has no upstream branch.
+# To push the current branch and set the remote as upstream, use
+#     git push --set-upstream origin release/2016.22
 
-# get commit SHA1 hashes of previous and this release branch
-# TODO: make master and HEAD configurable ?
-prev_release="$(git "${git_args[@]}" rev-parse --verify master)"
-this_release="$(git "${git_args[@]}" rev-parse --verify HEAD)"
-
-# TODO: use dd-date for this
 # shellcheck disable=SC2154
-timestamp="$(date "${release_notes_date_format}")"
+branch_name="${branch_release_prefix}/${release_name}"
 
-# render release notes filename
-# shellcheck disable=SC2059,SC2154
-release_notes_file="$(printf "${release_notes_tmpl}" \
-                             "${timestamp}" "${release_name}")"
-
-path_to_release_notes_file="${path_to_release_notes}/${release_notes_file}"
-
-
-# TODO: --format=format:<string> ?
-# TODO: internal / external release notes ?
-# TODO: make order and format configurable ?
-
-# http://stackoverflow.com/a/2099492
-echo -n 'Get details of commits to go into release: '
 # shellcheck disable=SC2154
-if output="$(git "${git_args[@]}" rev-list --topo-order --format=fuller \
-               "${prev_release}..${this_release}")"
-then
-    echo 'OK'
-    release_notes="${output}"
-else
-    echo 'ERROR'
-    echo "${output}"
-    exit 1
-fi
-
-echo -n 'Save commit details to release notes file: '
-if output="$(echo "${release_notes}" | awk '$0="    "$0' \
-              > "${path_to_release_notes_file}" 2>&1)"
-then
-    echo 'OK'
-else
-    echo 'ERROR'
-    echo "${output}"
-    exit 1
-fi
-
-echo -n 'Stage changes to release notes file: '
-if output="$(git "${git_args[@]}" add "${path_to_release_notes_file}" 2>&1)"
-then
-    echo 'OK'
-else
-    echo 'ERROR'
-    echo "${output}"
-    exit 1
-fi
-
-# shellcheck disable=SC2059,SC2154
-commit_msg="$(printf "${commit_msg_release_tmpl}" "${release_name}")"
-
-echo -n 'Commit changes to conf file: '
-# shellcheck disable=SC2154
-if output="$(git "${git_args[@]}" commit \
-               -m "${commit_msg}" "${path_to_release_notes_file}" 2>&1)"
+echo -n "Push release branch ${branch_name} to ${remote_default_name}: "
+if output="$(git "${git_args[@]}" push "${remote_default_name}" \
+               --set-upstream "${branch_name}" 2>&1)"
 then
     echo 'OK'
 else
@@ -243,5 +199,5 @@ fi
 
 
 echo
-echo 'release notes creation complete'
+echo 'release branch push complete'
 echo

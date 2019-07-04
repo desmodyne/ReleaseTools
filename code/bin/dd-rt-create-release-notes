@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 
-# dd-update-project-version
+# dd-rt-create-release-notes
 #
-# update semantic version in project configuration
+# create release notes
 #
 # author  : stefan schablowski
 # contact : stefan.schablowski@desmodyne.com
 # created : 2016-06-03
 
 
-# NOTE: see also ./dd-release
+# NOTE: see also ./dd-rt-release
 
-# major.minor.patch: http://semver.org
-# https://en.wikipedia.org/wiki/Software_versioning
+
+# TODO: this should be done later, so hotfixes are also mentioned
 
 
 echo
-echo 'update project version'
+echo 'create release notes'
 echo
 
 
@@ -80,6 +80,7 @@ path_to_rt_lib="${path_to_proj_root}/${path_to_rt_lib}"
 # shellcheck disable=SC1090
 if output="$(source "${path_to_rt_lib}" 2>&1)"
 then
+    # shellcheck disable=SC1090
     source "${path_to_rt_lib}"
 else
     echo "${output}"
@@ -90,7 +91,7 @@ fi
 # -----------------------------------------------------------------------------
 # run ReleaseTools boilerplate functions
 
-if ! get_script_args_opt_arg "${@}"; then exit 1; fi
+if ! get_script_args "${@}"; then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
@@ -102,6 +103,10 @@ repo_root="$(realpath "${repo_root}")"
 # absolute path to target project configuration file
 # shellcheck disable=SC2154
 conf_file="${repo_root}/${path_to_target_conf}"
+
+# absolute path to release notes folder
+# shellcheck disable=SC2154
+path_to_release_notes="${repo_root}/${path_to_release_notes}"
 
 # arguments passed to git (not to a sub-command) with every call
 git_args=('-C' "${repo_root}")
@@ -146,101 +151,88 @@ echo 'OK'
 # configure script parameters, cont. 3
 
 # shellcheck disable=SC2154
-old_major="$(jq -r '.major' <<< "${version}")"
-old_minor="$(jq -r '.minor' <<< "${version}")"
-old_patch="$(jq -r '.patch' <<< "${version}")"
+major="$(jq -r '.major' <<< "${version}")"
+minor="$(jq -r '.minor' <<< "${version}")"
+patch="$(jq -r '.patch' <<< "${version}")"
 
-# if no explicit version is passed as cmd line arg,
-# increment the one defined in project > version conf
-# shellcheck disable=SC2154
-if [ -z "${semver}" ]
-then
-    new_major="${old_major}"
-    new_minor="${old_minor}"
-    new_patch=$((old_patch + 1))
-
-# otherwise validate the cmd line arg and use it if valid
-else
-    current_semver="${old_major}.${old_minor}.${old_patch}"
-
-    # TODO: handle leading zeroes in cmd line arg ?
-    if [[ ! "${semver}" > "${current_semver}" ]]
-    then
-        # shellcheck disable=SC2059
-        msg="$(printf "${err_msg_git_conf}" \
-                      "${semver}" "${current_semver}" "${conf_file}")"
-        echo "${msg}"
-        exit 1
-    fi
-
-    new_major="$("${gsed}" -e "${sedex_semver_major}" <<< "${semver}")"
-    new_minor="$("${gsed}" -e "${sedex_semver_minor}" <<< "${semver}")"
-    new_patch="$("${gsed}" -e "${sedex_semver_patch}" <<< "${semver}")"
-fi
-
-release_name="${new_major}.${new_minor}.${new_patch}"
+release_name="${major}.${minor}.${patch}"
 
 
 # -----------------------------------------------------------------------------
-# update project version
-
-# NOTE: extra work to maintain formatting and comments in configuration file
-# NOTE: this opens conf_file a second time, this time accessing text natively
+# create release notes
 
 echo
+echo "Create notes for release ${release_name} in ${repo_root}:"
+
+# create output folder if required
+if [ ! -d "${path_to_release_notes}" ]
+then
+    mkdir -p "${path_to_release_notes}"
+fi
+
+# get commit SHA1 hashes of previous and this release branch
+# TODO: make master and HEAD configurable ?
+prev_release="$(git "${git_args[@]}" rev-parse --verify master)"
+this_release="$(git "${git_args[@]}" rev-parse --verify HEAD)"
+
+# TODO: use dd-date for this
+# shellcheck disable=SC2154
+timestamp="$(date "${release_notes_date_format}")"
+
+# render release notes filename
+# shellcheck disable=SC2059,SC2154
+release_notes_file="$(printf "${release_notes_tmpl}" \
+                             "${timestamp}" "${release_name}")"
+
+path_to_release_notes_file="${path_to_release_notes}/${release_notes_file}"
+
+
+# TODO: --format=format:<string> ?
+# TODO: internal / external release notes ?
+# TODO: make order and format configurable ?
+
+# http://stackoverflow.com/a/2099492
+echo -n 'Get details of commits to go into release: '
+# shellcheck disable=SC2154
+if output="$(git "${git_args[@]}" rev-list --topo-order --format=fuller \
+               "${prev_release}..${this_release}")"
+then
+    echo 'OK'
+    release_notes="${output}"
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+echo -n 'Save commit details to release notes file: '
+if output="$(echo "${release_notes}" | awk '$0="    "$0' \
+              > "${path_to_release_notes_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+echo -n 'Stage changes to release notes file: '
+if output="$(git "${git_args[@]}" add "${path_to_release_notes_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
 
 # shellcheck disable=SC2059,SC2154
-sedex_yaml_version="$(printf "${sedex_yaml_version_tmpl}"                   \
-                             "${old_major}" "${old_minor}" "${old_patch}"   \
-                             "${new_major}" "${new_minor}" "${new_patch}")"
-
-echo -n 'Create new version section: '
-# https://unix.stackexchange.com/a/152389
-# TODO: this leaks errors displayed by earlier commands
-# TODO: can this be done with <<< ?
-# shellcheck disable=SC2002,SC2154
-if output="$(cat "${conf_file}"                     \
-              | tr '\n' '\r'                        \
-              | "${sed}" -e "${sedex_yaml_version}" \
-              | tr '\r' '\n')"
-then
-    echo 'OK'
-    config="${output}"
-else
-    echo 'ERROR'
-    echo "${output}"
-    exit 1
-fi
-
-echo -n 'Save version section to conf file: '
-# TODO: does this pipe errors into the file ?
-# shellcheck disable=SC2116
-if output="$(echo "${config}" > "${conf_file}" 2>&1)"
-then
-    echo 'OK'
-else
-    echo 'ERROR'
-    echo "${output}"
-    exit 1
-fi
-
-echo -n 'Stage changes to conf file: '
-if output="$(git "${git_args[@]}" add "${conf_file}" 2>&1)"
-then
-    echo 'OK'
-else
-    echo 'ERROR'
-    echo "${output}"
-    exit 1
-fi
-
-# shellcheck disable=SC2059,SC2154
-commit_msg="$(printf "${commit_msg_version_tmpl}" "${release_name}")"
+commit_msg="$(printf "${commit_msg_release_tmpl}" "${release_name}")"
 
 echo -n 'Commit changes to conf file: '
 # shellcheck disable=SC2154
 if output="$(git "${git_args[@]}" commit \
-               -m "${commit_msg}" "${conf_file}" 2>&1)"
+               -m "${commit_msg}" "${path_to_release_notes_file}" 2>&1)"
 then
     echo 'OK'
 else
@@ -251,5 +243,5 @@ fi
 
 
 echo
-echo 'project version update complete'
+echo 'release notes creation complete'
 echo

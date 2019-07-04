@@ -1,20 +1,31 @@
 #!/usr/bin/env bash
 
-# dd-publish
+# dd-rt-release
 #
-# finish a software release and push it to remote
+# create a git flow release, update version, create release notes and push
 #
 # author  : stefan schablowski
 # contact : stefan.schablowski@desmodyne.com
-# created : 2016-06-06
+# created : 2016-06-04
 
 
-# NOTE: see also ./dd-release
-# TODO: dd-publish as a script name might be misleading
+# TODO: test scripts with projects that don't have any releases yet
+# TODO: check all scripts for git calls with relevant but unused log output
+# TODO: create another script to verify release / publish prerequisites:
+#  + verify release branch to create does not exist on remote yet
+#  + verify most recent previous release was merged to master
+#  + verify local master tracks remote master and is current
+# TODO: dd-rt-publish must not be done mindlessly, but only after (manual) test
+# and approval, so there should at least be a warning when script is run
+# TODO: sign the release tag cryptographically ? https://github.com/nvie/ ...
+# gitflow/wiki/Command-Line-Arguments#git-flow-release-finish--fsumpkn-version
+# TODO: verify preparations in dd-rt-start-release and dd-rt-finish-release are
+# required and if they are, do them elsewhere - and remove code duplication
+# TODO: before pushing finished release, test if tag exists locally
 
 
 echo
-echo 'publish software release'
+echo 'create software release'
 echo
 
 
@@ -35,8 +46,9 @@ path_to_rt_lib='code/bin/dd-rt-library.sh'
 
 # array with alphabetical list of tools called by this script
 # shellcheck disable=SC2034
-req_tools=('dd-finish-release' 'dd-push-finished-release'
-           'dd-verify-user-configuration' 'jq' 'realpath' 'yq')
+req_tools=('dd-rt-create-release-notes' 'dd-rt-push-release-branch'
+           'dd-rt-start-release' 'dd-rt-update-project-version'
+           'dd-rt-verify-user-configuration' 'jq' 'realpath' 'yq')
 
 # array with paths to append to PATH
 # shellcheck disable=SC2034
@@ -102,17 +114,20 @@ fi
 # -----------------------------------------------------------------------------
 # run ReleaseTools boilerplate functions
 
-if ! get_script_args "${@}"; then exit 1; fi
+if ! get_script_args_opt_arg "${@}"; then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
 # call the other scripts in the designated order
 
 # shellcheck disable=SC2154
-if ! dd-verify-user-configuration "${repo_root}"; then exit 1; fi
-if ! dd-finish-release            "${repo_root}"; then exit 1; fi
-if ! dd-push-finished-release     "${repo_root}"; then exit 1; fi
+if ! dd-rt-verify-user-configuration "${repo_root}"            ; then exit 1; fi
+# shellcheck disable=SC2154
+if ! dd-rt-start-release             "${repo_root}" "${semver}"; then exit 1; fi
+if ! dd-rt-update-project-version    "${repo_root}" "${semver}"; then exit 1; fi
+if ! dd-rt-create-release-notes      "${repo_root}"            ; then exit 1; fi
+if ! dd-rt-push-release-branch       "${repo_root}"            ; then exit 1; fi
 
 
-echo 'software release publishing complete'
+echo 'software release creation complete'
 echo

@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 
-# dd-verify-user-configuration
+# dd-rt-push-finished-release
 #
-# verify git configuration for current user
+# push a finished release to remote git repo
 #
 # author  : stefan schablowski
 # contact : stefan.schablowski@desmodyne.com
-# created : 2016-06-16
+# created : 2016-06-06
 
 
-# NOTE: see also ./dd-release
+# NOTE: see also ./dd-rt-release
 
 
 echo
-echo 'verify git user configuration'
+echo 'push finished release'
 echo
 
 
@@ -100,6 +100,9 @@ repo_root="$(realpath "${repo_root}")"
 # shellcheck disable=SC2154
 conf_file="${repo_root}/${path_to_target_conf}"
 
+# arguments passed to git (not to a sub-command) with every call
+git_args=('-C' "${repo_root}")
+
 
 # -----------------------------------------------------------------------------
 # load script configuration
@@ -121,9 +124,11 @@ fi
 echo -n 'Extract script configuration attributes: '
 # TODO: remove once more attributes
 # shellcheck disable=SC2043
-for attr in users
+for attr in version
 do
     output="$(jq -r ".${attr}" <<< "${config}")"
+    # https://unix.stackexchange.com/a/68349
+    # https://unix.stackexchange.com/a/41418
     if [ -n "${output}" ] && [ "${output}" != 'null' ]
     then
         declare "${attr}"="${output}"
@@ -137,61 +142,78 @@ echo 'OK'
 
 
 # -----------------------------------------------------------------------------
-# verify user configuration
+# configure script parameters, cont. 3
+
+# shellcheck disable=SC2154
+major="$(jq -r '.major' <<< "${version}")"
+minor="$(jq -r '.minor' <<< "${version}")"
+patch="$(jq -r '.patch' <<< "${version}")"
+
+release_name="${major}.${minor}.${patch}"
+
+
+# -----------------------------------------------------------------------------
+# push the finished release
+
+
+# TODO: create script to verify these prerequisites and run earlier than here
+
+# NOTE: this script expects to be called in the following context:
+# dd-rt-publish has finished the release, i.e. merged the release branch to master
+# and to develop, deleted the local release branch and created a release tag;
+# the tag and the changes merged to develop and master must be pushed to origin,
+# the release branch must be deleted at origin
+
 
 echo
-echo -n 'Verify user git configuration: '
 
-git_username="$( git -C "${repo_root}" config user.name)"
-git_useremail="$(git -C "${repo_root}" config user.email)"
-
-if [ -n "${git_username}" ] && [ -n "${git_useremail}" ]
+# NOTE: tag name is equal to release name by git flow convention
+# shellcheck disable=SC2154
+echo -n "Push release tag ${release_name} to ${remote_default_name}: "
+if output="$(git "${git_args[@]}" push "${remote_default_name}" \
+                                       "${release_name}" 2>&1)"
 then
     echo 'OK'
 else
-    echo 'incomplete'
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
 
-    current_username="$(id -u -n)"
+# TODO: git pull to deal with push rejections due to upstream changes:
+# To <git repo url>
+#    ! [rejected]        develop -> develop (non-fast-forward)
+#   error: failed to push some refs to '<git repo url>'
+#   hint: Updates were rejected because the tip of your current branch is behind
+#   hint: its remote counterpart. Integrate the remote changes (e.g.
+#   hint: 'git pull ...') before pushing again.
+#   hint: See the 'Note about fast-forwards' in 'git push --help' for details.
 
-    # set details for known users automatically
-    # shellcheck disable=SC2154
-    mapfile -t known_users <<< "$(jq -r 'keys[]' <<< "${users}")"
+# shellcheck disable=SC2154
+echo -n "Push changes merged to ${branch_develop} to ${remote_default_name}: "
+if output="$(git "${git_args[@]}" push "${remote_default_name}" \
+                                       "${branch_develop}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
 
-    if ! grep -q "${current_username}" <<< "${known_users[*]}"
-    then
-        # shellcheck disable=SC2154
-        echo "${err_msg_git_conf}"
-        echo
-        exit 1
-    else
-        username="$(jq -r ".[\"${current_username}\"].name"  <<< "${users}")"
-        email="$(   jq -r ".[\"${current_username}\"].email" <<< "${users}")"
-
-        echo "configure settings for known user ${current_username}:"
-
-        echo -n "  git config user.name '${username}': "
-        if output="$(git -C "${repo_root}" config user.name "'${username}'")"
-        then
-            echo 'OK'
-        else
-            echo 'ERROR'
-            echo "    ${output}"
-            exit 1
-        fi
-
-        echo -n "  git config user.email '${email}': "
-        if output="$(git -C "${repo_root}" config user.email "'${email}'")"
-        then
-            echo 'OK'
-        else
-            echo 'ERROR'
-            echo "    ${output}"
-            exit 1
-        fi
-    fi
+# shellcheck disable=SC2154
+echo -n "Push changes merged to ${branch_master} to ${remote_default_name}: "
+if output="$(git "${git_args[@]}" push "${remote_default_name}" \
+                                       "${branch_master}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
 fi
 
 
 echo
-echo 'git user configuration verification complete'
+echo 'pushing finished release complete'
 echo
