@@ -10,6 +10,13 @@
 
 
 # -----------------------------------------------------------------------------
+# disable shellcheck messages in entire file:
+# https://github.com/koalaman/shellcheck/wiki/Directive
+# shellcheck disable=SC2034
+true
+
+
+# -----------------------------------------------------------------------------
 # define constants
 
 
