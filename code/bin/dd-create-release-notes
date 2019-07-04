@@ -9,186 +9,239 @@
 # created : 2016-06-03
 
 
-echo
-echo 'dd-create-release-notes:'
-echo
+# NOTE: see also ./dd-release
 
-# -----------------------------------------------------------------------------
-# determine platform: http://stackoverflow.com/a/18434831
-
-# NOTE: on OS X, install GNU sed and grep using
-# brew tap homebrew/dupes; brew install gnu-sed grep
-# http://apple.stackexchange.com/a/69332
-
-case "${OSTYPE}" in
-    darwin*)
-        grep='ggrep'
-        sed='gsed'
-        ;;
-    linux*)
-        grep='grep'
-        sed='sed'
-        ;;
-    *)
-        echo "Unsupported operating system: ${OSTYPE}"
-        exit -1
-        ;;
-esac
-
-
-# -----------------------------------------------------------------------------
-# process command line arguments
-
-if [ $# -ne 1 ]
-then
-    echo "Usage: $(basename "$0") <repository root folder>"
-    exit -1
-else
-    if [ ! -e "$1" ]
-    then
-        echo "$1: No such file or directory"
-        exit -1
-    fi
-    if [ ! -d "$1" ]
-    then
-        echo "$1: Not a directory"
-        exit -1
-    fi
-fi
 
 # TODO: this should be done later, so hotfixes are also mentioned
-# TODO: prevent processing repo this file is in during development ?
-# TODO: verify required executables are available before using them ?
-# TODO: script return value when run as Jenkins job ?!?
-# TODO: test this with projects that don't have any releases yet
-# TODO: verify most recent release was merged to master ?!?
-# TODO: perform git branch status plausibility checks elsewhere
+
+
+echo
+echo 'create release notes'
+echo
 
 
 # -----------------------------------------------------------------------------
 # configure script parameters
 
-# absolute path to root folder of repository to process
-repo_root="$(realpath "$1")"
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# release branch prefix; 'release' as per git flow convention
-rel_prefix='release'
+# path from this script to project root
+path_to_proj_root='../..'
 
-# path to folder where release notes will be stored,
-# relative to root folder of repository to process
-output_folder='doc/md/Release Notes'
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
 
-# name of the generated release notes file;
-# release name will be amended further below
-output_filename="$(date +"%Y%m%d") Release Notes <release name>.md"
+# path to ReleaseTools library file, relative to project root
+path_to_rt_lib='code/bin/dd-rt-library.sh'
 
-# message for committing release notes
-# TODO: add project and release names ?
-commit_message='[#1]: add release notes'
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('git' 'jq' 'realpath' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=()
 
 
-# NOTE: pushd / popd require bash
-pushd "${repo_root}" > /dev/null
+# -----------------------------------------------------------------------------
+# load BashLib library
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont.
+
+# absolute, canonical path to project root
+path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+
+# absolute, canonical path to ReleaseTools library file
+path_to_rt_lib="${path_to_proj_root}/${path_to_rt_lib}"
+
+
+# -----------------------------------------------------------------------------
+# load ReleaseTools library
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_rt_lib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_rt_lib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run ReleaseTools boilerplate functions
+
+if ! get_script_args "${@}"; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont. 2
+
+# absolute, canonical path to the target project / repository root folder
+repo_root="$(realpath "${repo_root}")"
+
+# absolute path to target project configuration file
+# shellcheck disable=SC2154
+conf_file="${repo_root}/${path_to_target_conf}"
+
+# absolute path to release notes folder
+# shellcheck disable=SC2154
+path_to_release_notes="${repo_root}/${path_to_release_notes}"
+
+# arguments passed to git (not to a sub-command) with every call
+git_args=('-C' "${repo_root}")
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+echo
+
+echo -n 'Load script configuration file: '
+# shellcheck disable=SC2154
+if output="$(yq read "${conf_file}" --tojson 2>&1)"
+then
+    echo 'OK'
+    config="${output}"
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+echo -n 'Extract script configuration attributes: '
+# TODO: remove once more attributes
+# shellcheck disable=SC2043
+for attr in version
+do
+    output="$(jq -r ".${attr}" <<< "${config}")"
+    if [ -n "${output}" ] && [ "${output}" != 'null' ]
+    then
+        declare "${attr}"="${output}"
+    else
+        echo 'ERROR'
+        echo "Failed to get ${attr} attribute from configuration"
+        exit 1
+    fi
+done
+echo 'OK'
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont. 3
+
+# shellcheck disable=SC2154
+major="$(jq -r '.major' <<< "${version}")"
+minor="$(jq -r '.minor' <<< "${version}")"
+patch="$(jq -r '.patch' <<< "${version}")"
+
+release_name="${major}.${minor}.${patch}"
 
 
 # -----------------------------------------------------------------------------
 # create release notes
 
-echo "Create release notes in ${repo_root}:"
+echo
+echo "Create notes for release ${release_name} in ${repo_root}:"
 
 # create output folder if required
-if [ ! -d "${output_folder}" ]
+if [ ! -d "${path_to_release_notes}" ]
 then
-    mkdir -p "${output_folder}"
-fi
-
-# verify target project is on a release branch
-current_branch="$(git branch | "${grep}" '^* ' | "${sed}" -e 's|* ||g')"
-
-if [ -z "${current_branch}" ]
-then
-    echo "Failed to determine current branch"
-    popd > /dev/null
-    exit -1
-fi
-
-# http://stackoverflow.com/a/229606
-if [[ "${current_branch}" != *"${rel_prefix}"* ]]
-then
-    message="Project in ${repo_root} is not on a ${rel_prefix} branch, "
-    message+="but on ${current_branch}; please start a release first"
-    echo "${message}"
-    popd > /dev/null
-    exit -1
-fi
-
-# verify target project is on the latest release branch
-# TODO: is there a need to take local release branches into consideration ?
-# if dd-start-release is run with local release branches being present,
-# git flow aborts with a message like for example
-#   There is an existing release branch (2016.08.a ...
-#    ... release/2016.20.a release/2016.21.a). Finish that one first.
-# if dd-start-release is run with local release tag being present,
-# git flow aborts with a message like for example
-#   Tag '2016.21' already exists. Pick another name.
-
-# TODO: there might not be a need to find out the latest release branch;
-# git flow won't start a new release if there is an unfinished on in place
-latest_branch=$(git branch -a | "${grep}" "${rel_prefix}/" \
-                    | "${grep}" -o "${rel_prefix}/.*" | sort | uniq | tail -n 1)
-
-if [ -z "${latest_branch}" ]
-then
-    echo "Failed to determine latest release branch"
-    popd > /dev/null
-    exit -1
-fi
-
-if [[ "${current_branch}" != "${latest_branch}" ]]
-then
-    message="Project in ${repo_root} is not on the latest release branch "
-    message+="${latest_branch} but on ${current_branch}; please update first"
-    echo "${message}"
-    popd > /dev/null
-    exit -1
+    mkdir -p "${path_to_release_notes}"
 fi
 
 # get commit SHA1 hashes of previous and this release branch
 # TODO: make master and HEAD configurable ?
-prev_release="$(git rev-parse --verify master)"
-res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
-this_release="$(git rev-parse --verify HEAD)"
-res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+prev_release="$(git "${git_args[@]}" rev-parse --verify master)"
+this_release="$(git "${git_args[@]}" rev-parse --verify HEAD)"
 
-# https://github.com/koalaman/shellcheck/wiki/SC2001
-current_branch="${current_branch//${rel_prefix}\//}"
-output_filename="${output_filename//<release name>/${current_branch}}"
+# TODO: use dd-date for this
+# shellcheck disable=SC2154
+timestamp="$(date "${release_notes_date_format}")"
+
+# render release notes filename
+# shellcheck disable=SC2059,SC2154
+release_notes_file="$(printf "${release_notes_tmpl}" \
+                             "${timestamp}" "${release_name}")"
+
+path_to_release_notes_file="${path_to_release_notes}/${release_notes_file}"
+
 
 # TODO: --format=format:<string> ?
 # TODO: internal / external release notes ?
 # TODO: make order and format configurable ?
-# TODO: verify local master tracks remote master and is current
 
 # http://stackoverflow.com/a/2099492
-git rev-list --topo-order --format=fuller   \
-   "${prev_release}..${this_release}"       \
- | awk '$0="    "$0'                        \
- > "${output_folder}/${output_filename}"
- res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+echo -n 'Get details of commits to go into release: '
+# shellcheck disable=SC2154
+if output="$(git "${git_args[@]}" rev-list --topo-order --format=fuller \
+               "${prev_release}..${this_release}")"
+then
+    echo 'OK'
+    release_notes="${output}"
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
 
+echo -n 'Save commit details to release notes file: '
+if output="$(echo "${release_notes}" | awk '$0="    "$0' \
+              > "${path_to_release_notes_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
 
-# add and commit changes to git repository
-# TODO: error handling ? get log output ?
+echo -n 'Stage changes to release notes file: '
+if output="$(git "${git_args[@]}" add "${path_to_release_notes_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
 
-git add "${output_folder}/${output_filename}"
-res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
-git commit --message "${commit_message}"
-res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+# shellcheck disable=SC2059,SC2154
+commit_msg="$(printf "${commit_msg_release_tmpl}" "${release_name}")"
 
-
-popd > /dev/null
+echo -n 'Commit changes to conf file: '
+# shellcheck disable=SC2154
+if output="$(git "${git_args[@]}" commit \
+               -m "${commit_msg}" "${path_to_release_notes_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
 
 
 echo
-echo 'dd-create-release-notes: success'
+echo 'release notes creation complete'
 echo

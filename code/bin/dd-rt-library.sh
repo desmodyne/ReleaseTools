@@ -54,6 +54,12 @@ EOT
 # ----------------------
 # git flow configuration
 
+# message template for committing updated version to project conf file
+commit_msg_version_tmpl='[#1]: update project version to %s'
+
+# message template for committing release notes
+commit_msg_release_tmpl='[#1]: add release notes for version %s'
+
 # name of default git repo remote
 remote_default_name='origin'
 
@@ -65,15 +71,22 @@ branch_develop='develop'
 # 'master' as per git flow convention
 branch_master='master'
 
-# message template for committing updated version to project conf file
-commit_msg_version_tmpl='[#1]: update project version to %s'
+# name prefix of release branch;
+# 'release' as per git flow convention
+branch_release_prefix='release'
 
 
-# --------------------------
-# paths to files and folders
+# ------------------------------
+# paths to folders and filenames
 
 # path to project configuration file, relative to root of target project
 path_to_target_conf='.releasetools.yaml'
+
+# path to folder with release notes, relative to root of target project
+path_to_release_notes='doc/md/Release Notes'
+
+# name template for release notes file
+release_notes_tmpl="%s Release Notes %s.md"
 
 
 # ---------------------------
@@ -137,6 +150,14 @@ sedex_yaml_version_tmpl+='\\2%s\\3'
 sedex_yaml_version_tmpl+='\\4%s\\5'
 sedex_yaml_version_tmpl+='\\6%s\\7'
 sedex_yaml_version_tmpl+='|g'
+
+
+# -------------------------
+# other configuration items
+
+# 'date' format for release notes timestamp
+# TODO: add time to support multiple releases per day ?
+release_notes_date_format='+%Y%m%d'
 
 
 # -----------------------------------------------------------------------------
