@@ -9,6 +9,8 @@
 # created : 2016-06-03
 
 
+# NOTE: see also ./dd-release
+
 # major.minor.patch: http://semver.org
 # https://en.wikipedia.org/wiki/Software_versioning
 
@@ -128,8 +130,6 @@ echo -n 'Extract script configuration attributes: '
 for attr in version
 do
     output="$(jq -r ".${attr}" <<< "${config}")"
-    # https://unix.stackexchange.com/a/68349
-    # https://unix.stackexchange.com/a/41418
     if [ -n "${output}" ] && [ "${output}" != 'null' ]
     then
         declare "${attr}"="${output}"
@@ -159,8 +159,6 @@ then
     new_minor="${old_minor}"
     new_patch=$((old_patch + 1))
 
-    semver="${new_major}.${new_minor}.${new_patch}"
-
 # otherwise validate the cmd line arg and use it if valid
 else
     current_semver="${old_major}.${old_minor}.${old_patch}"
@@ -180,6 +178,8 @@ else
     new_patch="$("${gsed}" -e "${sedex_semver_patch}" <<< "${semver}")"
 fi
 
+release_name="${new_major}.${new_minor}.${new_patch}"
+
 
 # -----------------------------------------------------------------------------
 # update project version
@@ -187,6 +187,9 @@ fi
 # NOTE: extra work to maintain formatting and comments in configuration file
 # NOTE: this opens conf_file a second time, this time accessing text natively
 
+echo
+
+# shellcheck disable=SC2059,SC2154
 sedex_yaml_version="$(printf "${sedex_yaml_version_tmpl}"                   \
                              "${old_major}" "${old_minor}" "${old_patch}"   \
                              "${new_major}" "${new_minor}" "${new_patch}")"
@@ -194,6 +197,8 @@ sedex_yaml_version="$(printf "${sedex_yaml_version_tmpl}"                   \
 echo -n 'Create new version section: '
 # https://unix.stackexchange.com/a/152389
 # TODO: this leaks errors displayed by earlier commands
+# TODO: can this be done with <<< ?
+# shellcheck disable=SC2002,SC2154
 if output="$(cat "${conf_file}"                     \
               | tr '\n' '\r'                        \
               | "${sed}" -e "${sedex_yaml_version}" \
@@ -209,6 +214,7 @@ fi
 
 echo -n 'Save version section to conf file: '
 # TODO: does this pipe errors into the file ?
+# shellcheck disable=SC2116
 if output="$(echo "${config}" > "${conf_file}" 2>&1)"
 then
     echo 'OK'
@@ -223,21 +229,22 @@ if output="$(git "${git_args[@]}" add "${conf_file}" 2>&1)"
 then
     echo 'OK'
 else
-    echo 'ERROR:'
+    echo 'ERROR'
     echo "${output}"
     exit 1
 fi
 
+# shellcheck disable=SC2059,SC2154
 commit_msg="$(printf "${commit_msg_version_tmpl}" "${release_name}")"
 
-echo -n 'commit changes to conf file: '
+echo -n 'Commit changes to conf file: '
 # shellcheck disable=SC2154
 if output="$(git "${git_args[@]}" commit \
-               -m "${commit_msg_version}" "${conf_file}" 2>&1)"
+               -m "${commit_msg}" "${conf_file}" 2>&1)"
 then
     echo 'OK'
 else
-    echo 'ERROR:'
+    echo 'ERROR'
     echo "${output}"
     exit 1
 fi

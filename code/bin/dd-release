@@ -9,6 +9,14 @@
 # created : 2016-06-04
 
 
+# TODO: test scripts with projects that don't have any releases yet
+# TODO: check all scripts for git calls with relevant but unused log output
+# TODO: create another script to verify release / publish prerequisites:
+#  + verify release branch to create does not exist on remote yet
+#  + verify most recent previous release was merged to master
+#  + verify local master tracks remote master and is current
+
+
 echo
 echo 'create software release'
 echo
@@ -106,10 +114,11 @@ if ! get_script_args_opt_arg "${@}"; then exit 1; fi
 # call the other scripts in the designated order
 
 # shellcheck disable=SC2154
-if ! dd-verify-user-configuration "${repo_root}"; then exit 1; fi
-if ! dd-start-release "${repo_root}" "${semver}"; then exit 1; fi
-if ! dd-update-project-version    "${repo_root}"; then exit 1; fi
 # if ! dd-create-release-notes      "${repo_root}"; then exit 1; fi
+if ! dd-verify-user-configuration "${repo_root}"            ; then exit 1; fi
+# shellcheck disable=SC2154
+if ! dd-start-release             "${repo_root}" "${semver}"; then exit 1; fi
+if ! dd-update-project-version    "${repo_root}" "${semver}"; then exit 1; fi
 # if ! dd-push-release-branch       "${repo_root}"; then exit 1; fi
 
 

@@ -93,6 +93,8 @@ path_to_target_conf='.releasetools.yaml'
 # TODO: semver also allows e.g. 1, 2.0, 3.0.* and others
 regex_semver='^\([[:digit:]]\+\)\.\([[:digit:]]\+\)\.\([[:digit:]]\+\)$'
 
+# TODO: use smarter git command and remove [*]
+
 # regular expression to match branch name for
 # next release development in 'git branch' output
 regex_develop_local="^[ |*] ${branch_develop}$"

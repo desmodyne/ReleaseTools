@@ -13,7 +13,7 @@
 
 
 echo
-echo 'verify git configuration'
+echo 'verify git user configuration'
 echo
 
 
@@ -124,8 +124,6 @@ echo -n 'Extract script configuration attributes: '
 for attr in users
 do
     output="$(jq -r ".${attr}" <<< "${config}")"
-    # https://unix.stackexchange.com/a/68349
-    # https://unix.stackexchange.com/a/41418
     if [ -n "${output}" ] && [ "${output}" != 'null' ]
     then
         declare "${attr}"="${output}"
@@ -141,6 +139,7 @@ echo 'OK'
 # -----------------------------------------------------------------------------
 # verify user configuration
 
+echo
 echo -n 'Verify user git configuration: '
 
 git_username="$( git -C "${repo_root}" config user.name)"
@@ -194,5 +193,5 @@ fi
 
 
 echo
-echo 'git configuration verification complete'
+echo 'git user configuration verification complete'
 echo

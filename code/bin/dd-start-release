@@ -12,24 +12,6 @@
 # NOTE: see also ./dd-release
 
 
-# TODO: verify release branch to create does not exist on remote yet ?
-# TODO: add leading zero to calender week in release name
-# TODO: do something with the output when script succeeds, e.g.
-# Creating release 2016.21 in <path to project root>:
-# Switched to a new branch 'release/2016.21'
-#
-# Summary of actions:
-# - A new branch 'release/2016.21' was created, based on 'develop'
-# - You are now on branch 'release/2016.21'
-#
-# Follow-up actions:
-# - Bump the version number now!
-# - Start committing last-minute fixes in preparing your release
-# - When done, run:
-#
-#      git flow release finish '2016.21'
-
-
 echo
 echo 'start release'
 echo
@@ -217,6 +199,7 @@ fi
 # -----------------------------------------------------------------------------
 # start the release
 
+echo
 echo "Start release ${release_name} in ${repo_root}:"
 echo
 
