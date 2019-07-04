@@ -111,7 +111,7 @@ if ! get_script_args "${@}"; then exit 1; fi
 # shellcheck disable=SC2154
 if ! dd-verify-user-configuration "${repo_root}"; then exit 1; fi
 if ! dd-finish-release            "${repo_root}"; then exit 1; fi
-# if ! dd-push-finished-release     "${repo_root}"; then exit 1; fi
+if ! dd-push-finished-release     "${repo_root}"; then exit 1; fi
 
 
 echo 'software release publishing complete'
