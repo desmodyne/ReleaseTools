@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+
+# dd-rt-release
+#
+# create a git flow release, update version, create release notes and push
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-06-04
+
+
+# TODO: test scripts with projects that don't have any releases yet
+# TODO: check all scripts for git calls with relevant but unused log output
+# TODO: create another script to verify release / publish prerequisites:
+#  + verify release branch to create does not exist on remote yet
+#  + verify most recent previous release was merged to master
+#  + verify local master tracks remote master and is current
+# TODO: dd-rt-publish must not be done mindlessly, but only after (manual) test
+# and approval, so there should at least be a warning when script is run
+# TODO: sign the release tag cryptographically ? https://github.com/nvie/ ...
+# gitflow/wiki/Command-Line-Arguments#git-flow-release-finish--fsumpkn-version
+# TODO: verify preparations in dd-rt-start-release and dd-rt-finish-release are
+# required and if they are, do them elsewhere - and remove code duplication
+# TODO: before pushing finished release, test if tag exists locally
+
+
+echo
+echo 'create software release'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+path_to_proj_root='../..'
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# path to ReleaseTools library file, relative to project root
+path_to_rt_lib='code/bin/dd-rt-library.sh'
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('dd-rt-create-release-notes' 'dd-rt-push-release-branch'
+           'dd-rt-start-release' 'dd-rt-update-project-version'
+           'dd-rt-verify-user-configuration' 'jq' 'realpath' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
+
+
+# -----------------------------------------------------------------------------
+# load BashLib library
+
+# NOTE: this only tests if library can be sourced;
+# functions are only defined in "$(...)" subshell,
+# so a second source for use in here is required
+# https://github.com/koalaman/shellcheck/wiki/SC1090
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+# NOTE: ideally, these function calls would be something like e.g.
+#   if ! output="$(configure_platform 2>&1)"
+#     ...
+# but on the one hand, they have their own output which should be displayed as
+# it occurs and more importantly, any changes to global variables would only be
+# effective in the subshell created by the braces around the function name and
+# would be lost to this script, effectively rendering the function call useless
+
+if ! configure_platform              ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont.
+
+# absolute, canonical path to project root
+path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+
+# absolute, canonical path to ReleaseTools library file
+path_to_rt_lib="${path_to_proj_root}/${path_to_rt_lib}"
+
+
+# -----------------------------------------------------------------------------
+# load ReleaseTools library
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_rt_lib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_rt_lib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run ReleaseTools boilerplate functions
+
+if ! get_script_args_opt_arg "${@}"; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# call the other scripts in the designated order
+
+# shellcheck disable=SC2154
+if ! dd-rt-verify-user-configuration "${repo_root}"            ; then exit 1; fi
+# shellcheck disable=SC2154
+if ! dd-rt-start-release             "${repo_root}" "${semver}"; then exit 1; fi
+if ! dd-rt-update-project-version    "${repo_root}" "${semver}"; then exit 1; fi
+if ! dd-rt-create-release-notes      "${repo_root}"            ; then exit 1; fi
+if ! dd-rt-push-release-branch       "${repo_root}"            ; then exit 1; fi
+
+
+echo 'software release creation complete'
+echo

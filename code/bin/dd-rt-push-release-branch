@@ -1,0 +1,203 @@
+#!/usr/bin/env bash
+
+# dd-rt-push-release-branch
+#
+# push a release branch to remote git repo
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-06-06
+
+
+# NOTE: see also ./dd-rt-release
+
+
+echo
+echo 'push release branch'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+path_to_proj_root='../..'
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# path to ReleaseTools library file, relative to project root
+path_to_rt_lib='code/bin/dd-rt-library.sh'
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('git' 'jq' 'realpath' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=()
+
+
+# -----------------------------------------------------------------------------
+# load BashLib library
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont.
+
+# absolute, canonical path to project root
+path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+
+# absolute, canonical path to ReleaseTools library file
+path_to_rt_lib="${path_to_proj_root}/${path_to_rt_lib}"
+
+
+# -----------------------------------------------------------------------------
+# load ReleaseTools library
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_rt_lib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_rt_lib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run ReleaseTools boilerplate functions
+
+if ! get_script_args "${@}"; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont. 2
+
+# absolute, canonical path to the target project / repository root folder
+repo_root="$(realpath "${repo_root}")"
+
+# absolute path to target project configuration file
+# shellcheck disable=SC2154
+conf_file="${repo_root}/${path_to_target_conf}"
+
+# absolute path to release notes folder
+# shellcheck disable=SC2154
+path_to_release_notes="${repo_root}/${path_to_release_notes}"
+
+# arguments passed to git (not to a sub-command) with every call
+git_args=('-C' "${repo_root}")
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+echo
+
+echo -n 'Load script configuration file: '
+# shellcheck disable=SC2154
+if output="$(yq read "${conf_file}" --tojson 2>&1)"
+then
+    echo 'OK'
+    config="${output}"
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+echo -n 'Extract script configuration attributes: '
+# TODO: remove once more attributes
+# shellcheck disable=SC2043
+for attr in version
+do
+    output="$(jq -r ".${attr}" <<< "${config}")"
+    if [ -n "${output}" ] && [ "${output}" != 'null' ]
+    then
+        declare "${attr}"="${output}"
+    else
+        echo 'ERROR'
+        echo "Failed to get ${attr} attribute from configuration"
+        exit 1
+    fi
+done
+echo 'OK'
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont. 3
+
+# shellcheck disable=SC2154
+major="$(jq -r '.major' <<< "${version}")"
+minor="$(jq -r '.minor' <<< "${version}")"
+patch="$(jq -r '.patch' <<< "${version}")"
+
+release_name="${major}.${minor}.${patch}"
+
+
+# -----------------------------------------------------------------------------
+# push the release branch
+
+
+# TODO: create script to verify these prerequisites and run earlier than here
+
+# NOTE: this script expects to be called in the following context:
+# dd-rt-release has started a release, updated the project version and created
+# release notes; the target repo is on the release branch and there are no
+# tags yet; only the release branch needs to be pushed to origin
+
+# TODO: deal with improperly set up remotes not using 'origin':
+# git flow heavily relies on that convention:
+#   fatal: No configured push destination.
+#   Either specify the URL from the command-line or configure a remote repository using
+#       git remote add <name> <url>
+#   and then push using the remote name
+#       git push <name>
+
+
+echo
+
+# NOTE: 'git push' alone fails with e.g.
+# fatal: The current branch release/2016.22 has no upstream branch.
+# To push the current branch and set the remote as upstream, use
+#     git push --set-upstream origin release/2016.22
+
+# shellcheck disable=SC2154
+branch_name="${branch_release_prefix}/${release_name}"
+
+# shellcheck disable=SC2154
+echo -n "Push release branch ${branch_name} to ${remote_default_name}: "
+if output="$(git "${git_args[@]}" push "${remote_default_name}" \
+               --set-upstream "${branch_name}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+
+echo
+echo 'release branch push complete'
+echo
