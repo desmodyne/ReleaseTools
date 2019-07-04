@@ -73,32 +73,32 @@ fi
 repo_root="$(realpath "$1")"
 
 # name of default git repo remote
-default_remote_name='origin'
+remote_default_name='origin'
 
 # name of branch for next release development;
 # 'develop' as per git flow convention
-develop_branch='develop'
+branch_develop='develop'
 
 # regular expression to match branch name for
 # next release development in 'git branch' output
-regex_develop_local="^[ |*] ${develop_branch}$"
+regex_develop_local="^[ |*] ${branch_develop}$"
 
 # same as above, but for remote branches
-regex_develop_remote="^  ${default_remote_name}/${develop_branch}$"
+regex_develop_remote="^  ${remote_default_name}/${branch_develop}$"
 
 # name of branch for production releases;
 # 'master' as per git flow convention
-master_branch='master'
+branch_master='master'
 
 # release branch prefix; 'release' as per git flow convention
-rel_prefix='release'
+branch_release_prefix='release'
 
 # regular expression to match branch name for
 # production releases in 'git branch' output
-regex_master_local="^[ |*] ${master_branch}$"
+regex_master_local="^[ |*] ${branch_master}$"
 
 # same as above, but for remote branches
-regex_master_remote="^  ${default_remote_name}/${master_branch}$"
+regex_master_remote="^  ${remote_default_name}/${branch_master}$"
 
 # message for creating release tag
 # TODO: add project and release names ?
@@ -123,7 +123,7 @@ pushd "${repo_root}" > /dev/null
 # name of the release in progress
 # TODO: this assumes there is only one local release branch at a time - which is
 # reasonable as git flow refuses to start a release if there is already one
-release_name="$(git branch | grep "^[*| ] ${rel_prefix}" | cut -d / -f 2)"
+release_name="$(git branch | grep "^[*| ] ${branch_release_prefix}" | cut -d / -f 2)"
 
 if [ -z "${release_name}" ]
 then
@@ -210,7 +210,7 @@ do
 
             local_branches="$(git branch)"
 
-            echo -n "Production release branch (${master_branch}): "
+            echo -n "Production release branch (${branch_master}): "
 
             if echo "${local_branches}" | grep -q "${regex_master_local}"
             then
@@ -222,17 +222,17 @@ do
 
                 if echo "${remote_branches}" | grep -q "${regex_master_remote}"
                 then
-                    echo "git checkout ${master_branch}"
-                    git checkout "${master_branch}"
+                    echo "git checkout ${branch_master}"
+                    git checkout "${branch_master}"
                     res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
                     echo
                 else
-                    echo "Failed to obtain ${master_branch} from ${default_remote_name}"
+                    echo "Failed to obtain ${branch_master} from ${remote_default_name}"
                     exit -1
                 fi
             fi
 
-            echo -n "Next release development branch (${develop_branch}): "
+            echo -n "Next release development branch (${branch_develop}): "
 
             if echo "${local_branches}" | grep -q "${regex_develop_local}"
             then
@@ -245,12 +245,12 @@ do
 
                 if echo "${remote_branches}" | grep -q "${regex_develop_remote}"
                 then
-                    echo "git checkout ${develop_branch}"
-                    git checkout "${develop_branch}"
+                    echo "git checkout ${branch_develop}"
+                    git checkout "${branch_develop}"
                     res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
                     echo
                 else
-                    echo "Failed to obtain ${develop_branch} from ${default_remote_name}"
+                    echo "Failed to obtain ${branch_develop} from ${remote_default_name}"
                     exit -1
                 fi
             fi

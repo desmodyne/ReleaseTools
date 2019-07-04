@@ -228,7 +228,7 @@ else
     exit 1
 fi
 
-commit_msg_version="$(printf "${commit_msg_version_tmpl}" "${semver}")"
+commit_msg="$(printf "${commit_msg_version_tmpl}" "${release_name}")"
 
 echo -n 'commit changes to conf file: '
 # shellcheck disable=SC2154

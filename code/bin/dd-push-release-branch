@@ -46,7 +46,7 @@ fi
 repo_root="$(realpath "$1")"
 
 # release branch prefix; 'release' as per git flow convention
-rel_prefix='release'
+branch_release_prefix='release'
 
 
 # NOTE: pushd / popd require bash
@@ -72,7 +72,7 @@ pushd "${repo_root}" > /dev/null
 # name of the release in progress
 # TODO: this assumes there is only one local release branch at a time - which is
 # reasonable as git flow refuses to start a release if there is already one
-release_name="$(git branch | grep "^[*| ] ${rel_prefix}" | cut -d / -f 2)"
+release_name="$(git branch | grep "^[*| ] ${branch_release_prefix}" | cut -d / -f 2)"
 
 if [ -z "${release_name}" ]
 then
@@ -92,8 +92,8 @@ then
     SSH_AUTH_SOCK='/home/bob.the.builder/.ssh/ssh_auth_sock'
 fi
 
-echo "Push release branch ${rel_prefix}/${release_name} to origin:"
-git push origin --set-upstream "${rel_prefix}/${release_name}"
+echo "Push release branch ${branch_release_prefix}/${release_name} to origin:"
+git push origin --set-upstream "${branch_release_prefix}/${release_name}"
 
 res="$?"
 

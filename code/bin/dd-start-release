@@ -273,7 +273,7 @@ do
         # if [[ "${local_branches}" =~ "${regex_master_local}" ]]
 
         # shellcheck disable=SC2154
-        echo -n "Production release branch (${master_branch}): "
+        echo -n "Production release branch (${branch_master}): "
 
         # https://github.com/koalaman/shellcheck/wiki/SC2143
         # shellcheck disable=SC2154
@@ -291,12 +291,12 @@ do
             if ! grep -q "${regex_master_remote}" <<< "${remote_branches}"
             then
                 # shellcheck disable=SC2154
-                msg="Failed to get ${master_branch} from ${default_remote_name}"
+                msg="Failed to get ${branch_master} from ${remote_default_name}"
                 echo "${msg}"
                 exit 1
             else
-                echo "git checkout ${master_branch}"
-                if ! git "${git_args[@]}" checkout "${master_branch}"
+                echo "git checkout ${branch_master}"
+                if ! git "${git_args[@]}" checkout "${branch_master}"
                 then
                     exit 1
                 fi
@@ -305,7 +305,7 @@ do
         fi
 
         # shellcheck disable=SC2154
-        echo -n "Next release development branch (${develop_branch}): "
+        echo -n "Next release development branch (${branch_develop}): "
 
         # shellcheck disable=SC2154
         if grep -q "${regex_develop_local}" <<< "${local_branches}"
@@ -322,13 +322,13 @@ do
             # shellcheck disable=SC2154
             if ! grep -q "${regex_develop_remote}" <<< "${remote_branches}"
             then
-                msg="Failed to obtain ${develop_branch} "
-                msg+="from ${default_remote_name}"
+                msg="Failed to obtain ${branch_develop} "
+                msg+="from ${remote_default_name}"
                 echo "${msg}"
                 exit 1
             else
-                echo "git checkout ${develop_branch}"
-                if ! git "${git_args[@]}" checkout "${develop_branch}"
+                echo "git checkout ${branch_develop}"
+                if ! git "${git_args[@]}" checkout "${branch_develop}"
                 then
                     exit 1
                 fi

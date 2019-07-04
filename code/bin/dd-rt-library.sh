@@ -55,15 +55,15 @@ EOT
 # git flow configuration
 
 # name of default git repo remote
-default_remote_name='origin'
+remote_default_name='origin'
 
 # name of branch for next release development;
 # 'develop' as per git flow convention
-develop_branch='develop'
+branch_develop='develop'
 
 # name of branch for production releases;
 # 'master' as per git flow convention
-master_branch='master'
+branch_master='master'
 
 # message template for committing updated version to project conf file
 commit_msg_version_tmpl='[#1]: update project version to %s'
@@ -95,17 +95,17 @@ regex_semver='^\([[:digit:]]\+\)\.\([[:digit:]]\+\)\.\([[:digit:]]\+\)$'
 
 # regular expression to match branch name for
 # next release development in 'git branch' output
-regex_develop_local="^[ |*] ${develop_branch}$"
+regex_develop_local="^[ |*] ${branch_develop}$"
 
 # same as above, but for remote branches
-regex_develop_remote="^  ${default_remote_name}/${develop_branch}$"
+regex_develop_remote="^  ${remote_default_name}/${branch_develop}$"
 
 # regular expression to match branch name for
 # production releases in 'git branch' output
-regex_master_local="^[ |*] ${master_branch}$"
+regex_master_local="^[ |*] ${branch_master}$"
 
 # same as above, but for remote branches
-regex_master_remote="^  ${default_remote_name}/${master_branch}$"
+regex_master_remote="^  ${remote_default_name}/${branch_master}$"
 
 # GNU sed expression to get major from semver
 sedex_semver_major='s|^\([0-9]\+\)\..*|\1|g'

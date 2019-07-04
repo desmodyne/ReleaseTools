@@ -70,13 +70,13 @@ repo_root="$(realpath "$1")"
 
 # release branch prefix; 'release' as per git flow convention
 # TODO: remove this with the inactive branch deletion below
-# rel_prefix='release'
+# branch_release_prefix='release'
 
 # develop branch; 'develop' as per git flow convention
-develop_branch='develop'
+branch_develop='develop'
 
 # master branch; 'master' as per git flow convention
-master_branch='master'
+branch_master='master'
 
 # regex pattern for most recent commit message
 message_regex="^Merge tag '(.*)' into develop"
@@ -155,8 +155,8 @@ fi
 #   hint: 'git pull ...') before pushing again.
 #   hint: See the 'Note about fast-forwards' in 'git push --help' for details.
 
-echo "Push changes merged to ${develop_branch} to origin:"
-git push origin "${develop_branch}"
+echo "Push changes merged to ${branch_develop} to origin:"
+git push origin "${branch_develop}"
 
 res="$?"
 
@@ -167,8 +167,8 @@ then
     exit "${res}"
 fi
 
-echo "Push changes merged to ${master_branch} to origin:"
-git push origin "${master_branch}"
+echo "Push changes merged to ${branch_master} to origin:"
+git push origin "${branch_master}"
 
 res="$?"
 
@@ -183,8 +183,8 @@ fi
 # this seems no longer required, the remote release branch is already
 # deleted by git flow release finish --> delete only if exists (?)
 #
-# echo "Delete release branch ${rel_prefix}/${release_name} on origin:"
-# git push origin --delete "${rel_prefix}/${release_name}"
+# echo "Delete release branch ${branch_release_prefix}/${release_name} on origin:"
+# git push origin --delete "${branch_release_prefix}/${release_name}"
 #
 # res="$?"
 #
