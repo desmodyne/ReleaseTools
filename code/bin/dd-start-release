@@ -31,7 +31,7 @@
 
 
 echo
-echo 'start release:'
+echo 'start release'
 echo
 
 
@@ -194,7 +194,7 @@ patch="$(jq -r '.patch' <<< "${version}")"
 if [ -z "${semver}" ]
 then
     patch=$((patch + 1))
-    canonical_release_name="${major}.${minor}.${patch}"
+    release_name="${major}.${minor}.${patch}"
 
 # otherwise validate the cmd line arg and use it if valid
 else
@@ -210,14 +210,12 @@ else
         exit 1
     fi
 
-    canonical_release_name="${semver}"
+    release_name="${semver}"
 fi
 
 
 # -----------------------------------------------------------------------------
 # start the release
-
-release_name="${canonical_release_name}"
 
 echo "Start release ${release_name} in ${repo_root}:"
 echo
@@ -272,14 +270,14 @@ do
 
         # NOTE: bash regex doesn't seem to support matching
         # line ends within a multi-line search string:
-        # if [[ "${local_branches}" =~ "${local_master_regex}" ]]
+        # if [[ "${local_branches}" =~ "${regex_master_local}" ]]
 
         # shellcheck disable=SC2154
         echo -n "Production release branch (${master_branch}): "
 
         # https://github.com/koalaman/shellcheck/wiki/SC2143
         # shellcheck disable=SC2154
-        if grep -q "${local_master_regex}" <<< "${local_branches}"
+        if grep -q "${regex_master_local}" <<< "${local_branches}"
         then
             echo 'OK'
         else
@@ -290,7 +288,7 @@ do
             # need to test if remote branch exists first in order not to create
             # a new independent branch or get into a  'detached HEAD' state
             # shellcheck disable=SC2154
-            if ! grep -q "${remote_master_regex}" <<< "${remote_branches}"
+            if ! grep -q "${regex_master_remote}" <<< "${remote_branches}"
             then
                 # shellcheck disable=SC2154
                 msg="Failed to get ${master_branch} from ${default_remote_name}"
@@ -310,7 +308,7 @@ do
         echo -n "Next release development branch (${develop_branch}): "
 
         # shellcheck disable=SC2154
-        if grep -q "${regex_local_develop}" <<< "${local_branches}"
+        if grep -q "${regex_develop_local}" <<< "${local_branches}"
         then
             echo 'OK'
             echo
@@ -322,7 +320,7 @@ do
             # need to test if remote branch exists first in order not to create
             # a new independent branch or get into a 'detached HEAD' state
             # shellcheck disable=SC2154
-            if ! grep -q "${regex_remote_develop}" <<< "${remote_branches}"
+            if ! grep -q "${regex_develop_remote}" <<< "${remote_branches}"
             then
                 msg="Failed to obtain ${develop_branch} "
                 msg+="from ${default_remote_name}"

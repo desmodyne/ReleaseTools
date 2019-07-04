@@ -81,10 +81,10 @@ develop_branch='develop'
 
 # regular expression to match branch name for
 # next release development in 'git branch' output
-local_develop_regex="^[ |*] ${develop_branch}$"
+regex_develop_local="^[ |*] ${develop_branch}$"
 
 # same as above, but for remote branches
-remote_develop_regex="^  ${default_remote_name}/${develop_branch}$"
+regex_develop_remote="^  ${default_remote_name}/${develop_branch}$"
 
 # name of branch for production releases;
 # 'master' as per git flow convention
@@ -95,10 +95,10 @@ rel_prefix='release'
 
 # regular expression to match branch name for
 # production releases in 'git branch' output
-local_master_regex="^[ |*] ${master_branch}$"
+regex_master_local="^[ |*] ${master_branch}$"
 
 # same as above, but for remote branches
-remote_master_regex="^  ${default_remote_name}/${master_branch}$"
+regex_master_remote="^  ${default_remote_name}/${master_branch}$"
 
 # message for creating release tag
 # TODO: add project and release names ?
@@ -212,7 +212,7 @@ do
 
             echo -n "Production release branch (${master_branch}): "
 
-            if echo "${local_branches}" | grep -q "${local_master_regex}"
+            if echo "${local_branches}" | grep -q "${regex_master_local}"
             then
                 echo 'OK'
             else
@@ -220,7 +220,7 @@ do
                 echo 'Attempt to check it out from default remote:'
                 remote_branches="$(git branch -r)"
 
-                if echo "${remote_branches}" | grep -q "${remote_master_regex}"
+                if echo "${remote_branches}" | grep -q "${regex_master_remote}"
                 then
                     echo "git checkout ${master_branch}"
                     git checkout "${master_branch}"
@@ -234,7 +234,7 @@ do
 
             echo -n "Next release development branch (${develop_branch}): "
 
-            if echo "${local_branches}" | grep -q "${local_develop_regex}"
+            if echo "${local_branches}" | grep -q "${regex_develop_local}"
             then
                 echo 'OK'
                 echo
@@ -243,7 +243,7 @@ do
                 echo 'Attempt to check it out from default remote:'
                 remote_branches="$(git branch -r)"
 
-                if echo "${remote_branches}" | grep -q "${remote_develop_regex}"
+                if echo "${remote_branches}" | grep -q "${regex_develop_remote}"
                 then
                     echo "git checkout ${develop_branch}"
                     git checkout "${develop_branch}"

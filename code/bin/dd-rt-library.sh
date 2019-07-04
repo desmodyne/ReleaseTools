@@ -65,6 +65,9 @@ develop_branch='develop'
 # 'master' as per git flow convention
 master_branch='master'
 
+# message template for committing updated version to project conf file
+commit_msg_version_tmpl='[#1]: update project version to %s'
+
 
 # --------------------------
 # paths to files and folders
@@ -73,8 +76,8 @@ master_branch='master'
 path_to_target_conf='.releasetools.yaml'
 
 
-# -------------------
-# regular expressions
+# ---------------------------
+# regular and sed expressions
 
 # regular expression that matches a semantic version:
 # MAJOR.MINOR.PATCH versioning: http://semver.org
@@ -92,17 +95,46 @@ regex_semver='^\([[:digit:]]\+\)\.\([[:digit:]]\+\)\.\([[:digit:]]\+\)$'
 
 # regular expression to match branch name for
 # next release development in 'git branch' output
-regex_local_develop="^[ |*] ${develop_branch}$"
+regex_develop_local="^[ |*] ${develop_branch}$"
 
 # same as above, but for remote branches
-regex_remote_develop="^  ${default_remote_name}/${develop_branch}$"
+regex_develop_remote="^  ${default_remote_name}/${develop_branch}$"
 
 # regular expression to match branch name for
 # production releases in 'git branch' output
-local_master_regex="^[ |*] ${master_branch}$"
+regex_master_local="^[ |*] ${master_branch}$"
 
 # same as above, but for remote branches
-remote_master_regex="^  ${default_remote_name}/${master_branch}$"
+regex_master_remote="^  ${default_remote_name}/${master_branch}$"
+
+# GNU sed expression to get major from semver
+sedex_semver_major='s|^\([0-9]\+\)\..*|\1|g'
+
+# GNU sed expression to get minor from semver
+sedex_semver_minor='s|^.*\.\([0-9]\+\)\..*$|\1|g'
+
+# GNU sed expression to get patch from semver
+sedex_semver_patch='s|.*\.\([0-9]\+\)$|\1|g'
+
+# GNU sed expression template to match multi-line version in yaml conf file
+# NOTE: this works on a file that has been prepared using tr '\n' '\r'
+# NOTE: need to escape \r and \1, \2, etc. as this template gets printf'd
+# NOTE: this uses Perl extended regular expression syntax
+# https://unix.stackexchange.com/a/152389
+# https://stackoverflow.com/a/152755
+# https://stackoverflow.com/a/7167115 <-- hard to grok regex
+# TODO: this assumes there are no comments within the version conf section
+sedex_yaml_version_tmpl='s|'
+sedex_yaml_version_tmpl+='\(version\s*:\s*\\r\)'
+sedex_yaml_version_tmpl+='\(\s*major\s*:\s*\)%s\(\s*\\r\)'
+sedex_yaml_version_tmpl+='\(\s*minor\s*:\s*\)%s\(\s*\\r\)'
+sedex_yaml_version_tmpl+='\(\s*patch\s*:\s*\)%s\(\s*\\r\)'
+sedex_yaml_version_tmpl+='|'
+sedex_yaml_version_tmpl+='\\1'
+sedex_yaml_version_tmpl+='\\2%s\\3'
+sedex_yaml_version_tmpl+='\\4%s\\5'
+sedex_yaml_version_tmpl+='\\6%s\\7'
+sedex_yaml_version_tmpl+='|g'
 
 
 # -----------------------------------------------------------------------------
