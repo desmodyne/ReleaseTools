@@ -2,95 +2,117 @@
 
 # dd-publish
 #
-# publish a software release
+# finish a software release and push it to remote
 #
 # author  : stefan schablowski
 # contact : stefan.schablowski@desmodyne.com
 # created : 2016-06-06
 
 
-# -----------------------------------------------------------------------------
-# process command line arguments
+# NOTE: see also ./dd-release
+# TODO: dd-publish as a script name might be misleading
 
-if [ $# -ne 1 ]
-then
-    echo "Usage: $(basename "$0") <repository root folder>"
-    exit -1
-else
-    if [ ! -e "$1" ]
-    then
-        echo "$1: No such file or directory"
-        exit -1
-    fi
-    if [ ! -d "$1" ]
-    then
-        echo "$1: Not a directory"
-        exit -1
-    fi
-fi
+
+echo
+echo 'publish software release'
+echo
 
 
 # -----------------------------------------------------------------------------
 # configure script parameters
 
-# absolute path to the root folder of the repository to process
-repo_root="$(realpath "$1")"
-
-# list of tools called by this script
-req_tools='dd-verify-user-configuration dd-finish-release '
-req_tools+='dd-push-finished-release'
-
 # absolute path to this script: http://stackoverflow.com/a/9107028
-path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+path_to_proj_root='../..'
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# path to ReleaseTools library file, relative to project root
+path_to_rt_lib='code/bin/dd-rt-library.sh'
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('dd-finish-release' 'dd-push-finished-release'
+           'dd-verify-user-configuration' 'jq' 'realpath' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
 
 
 # -----------------------------------------------------------------------------
-# determine path to other ReleaseTools scripts
+# load BashLib library
 
-# In production, all ReleaseTools scripts are installed  using a distribution
-# package and any (ReleaseTools or other, e.g. Linux system) tools are found
-# in PATH; during development, this is not necessarily the case: Test if all
-# tools are found and if one is missing, append the path this script resides in
-# to PATH and retry. This does not mix package / production and development
-# versions, either all ReleaseTools scripts are taken from PATH or from local.
-
-amended_path=false
-
-for req_tool in ${req_tools}
-do
-    if [ -z "$(which "${req_tool}")" ]
-    then
-        echo "${req_tool}: No such file or directory; amend PATH and retry"
-        PATH="${path_to_this_script}:${PATH}"
-        amended_path=true
-    fi
-done
-
-if [ "${amended_path}" = true ]
+# NOTE: this only tests if library can be sourced;
+# functions are only defined in "$(...)" subshell,
+# so a second source for use in here is required
+# https://github.com/koalaman/shellcheck/wiki/SC1090
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
 then
-    for req_tool in ${req_tools}
-    do
-        if [ -z "$(which "${req_tool}")" ]
-        then
-            echo "${req_tool}: No such file or directory"
-            exit -1
-        fi
-    done
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
 fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+# NOTE: ideally, these function calls would be something like e.g.
+#   if ! output="$(configure_platform 2>&1)"
+#     ...
+# but on the one hand, they have their own output which should be displayed as
+# it occurs and more importantly, any changes to global variables would only be
+# effective in the subshell created by the braces around the function name and
+# would be lost to this script, effectively rendering the function call useless
+
+if ! configure_platform              ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont.
+
+# absolute, canonical path to project root
+path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+
+# absolute, canonical path to ReleaseTools library file
+path_to_rt_lib="${path_to_proj_root}/${path_to_rt_lib}"
+
+
+# -----------------------------------------------------------------------------
+# load ReleaseTools library
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_rt_lib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_rt_lib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run ReleaseTools boilerplate functions
+
+if ! get_script_args "${@}"; then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
 # call the other scripts in the designated order
 
-# TODO: review error handling (use trap with error function ?)
-# TODO: this must not be done mindlessly, but only after (manual) test
-# and approval, so there should at least be a warning when this is run
+# shellcheck disable=SC2154
+if ! dd-verify-user-configuration "${repo_root}"; then exit 1; fi
+if ! dd-finish-release            "${repo_root}"; then exit 1; fi
+# if ! dd-push-finished-release     "${repo_root}"; then exit 1; fi
 
-dd-verify-user-configuration "${repo_root}"
-res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
 
-dd-finish-release "${repo_root}"
-res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
-
-dd-push-finished-release "${repo_root}"
-res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+echo 'software release publishing complete'
+echo

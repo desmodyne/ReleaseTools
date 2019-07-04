@@ -9,136 +9,155 @@
 # created : 2016-06-04
 
 
+# NOTE: see also ./dd-release
+
+
 echo
-echo 'dd-finish-release:'
+echo 'finish release'
 echo
-
-# -----------------------------------------------------------------------------
-# process command line arguments
-
-if [ $# -ne 1 ]
-then
-    echo "Usage: $(basename "$0") <repository root folder>"
-    exit -1
-else
-    if [ ! -e "$1" ]
-    then
-        echo "$1: No such file or directory"
-        exit -1
-    fi
-    if [ ! -d "$1" ]
-    then
-        echo "$1: Not a directory"
-        exit -1
-    fi
-fi
-
-# TODO: prevent processing repo this file is in during development ?
-# TODO: verify required executables are available before using them ?
-# TODO: script return value when run as Jenkins job ?!?
-# TODO: add leading zero to calender week in release name
-# TODO: get release name from git branch ? plausibility checks ?
-# TODO: sign the release tag cryptographically ? https://github.com/nvie/ ...
-# gitflow/wiki/Command-Line-Arguments#git-flow-release-finish--fsumpkn-version
-# TODO: do something with the output when script succeeds, e.g.
-# Finishing release 2016.21 in <path to project root>:
-# Switched to branch 'master'
-# Your branch is up-to-date with 'origin/master'.
-# Merge made by the 'recursive' strategy.
-#  build/CMakeLists.txt                                     |  2 +-
-#  doc/txt/Release Notes/20160604 Release Notes 2016.21.txt | 17 +++++++++++++++++
-#  2 files changed, 18 insertions(+), 1 deletion(-)
-#  create mode 100644 doc/txt/Release Notes/20160604 Release Notes 2016.21.txt
-# Switched to branch 'develop'
-# Your branch is up-to-date with 'origin/develop'.
-# Merge made by the 'recursive' strategy.
-#  build/CMakeLists.txt                                     |  2 +-
-#  doc/txt/Release Notes/20160604 Release Notes 2016.21.txt | 17 +++++++++++++++++
-#  2 files changed, 18 insertions(+), 1 deletion(-)
-#  create mode 100644 doc/txt/Release Notes/20160604 Release Notes 2016.21.txt
-# Deleted branch release/2016.21 (was 14cc582).
-#
-# Summary of actions:
-# - Latest objects have been fetched from 'origin'
-# - Release branch has been merged into 'master'
-# - The release was tagged '2016.21'
-# - Release branch has been back-merged into 'develop'
-# - Release branch 'release/2016.21' has been deleted
 
 
 # -----------------------------------------------------------------------------
 # configure script parameters
 
-# absolute path to the root folder of the repository to process
-repo_root="$(realpath "$1")"
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# name of default git repo remote
-remote_default_name='origin'
+# path from this script to project root
+path_to_proj_root='../..'
 
-# name of branch for next release development;
-# 'develop' as per git flow convention
-branch_develop='develop'
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
 
-# regular expression to match branch name for
-# next release development in 'git branch' output
-regex_develop_local="^[ |*] ${branch_develop}$"
+# path to ReleaseTools library file, relative to project root
+path_to_rt_lib='code/bin/dd-rt-library.sh'
 
-# same as above, but for remote branches
-regex_develop_remote="^  ${remote_default_name}/${branch_develop}$"
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('git' 'jq' 'realpath' 'yq')
 
-# name of branch for production releases;
-# 'master' as per git flow convention
-branch_master='master'
-
-# release branch prefix; 'release' as per git flow convention
-branch_release_prefix='release'
-
-# regular expression to match branch name for
-# production releases in 'git branch' output
-regex_master_local="^[ |*] ${branch_master}$"
-
-# same as above, but for remote branches
-regex_master_remote="^  ${remote_default_name}/${branch_master}$"
-
-# message for creating release tag
-# TODO: add project and release names ?
-# TODO: on OSX, getopt fails on spaces, even
-# with extra / escaped single / double quotes:
-# https://github.com/nvie/gitflow/issues/98
-# TODO: does this also occur on on Linux ?
-tag_message='automatically_created_release_tag'
-
-# the message of an expectable and recoverable error
-err_msg_git_flow_init='Fatal: Not a gitflow-enabled repo yet. ' \
-err_msg_git_flow_init+="Please run 'git flow init' first."
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=()
 
 
-# NOTE: pushd / popd require bash
-pushd "${repo_root}" > /dev/null
+# -----------------------------------------------------------------------------
+# load BashLib library
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont.
+
+# absolute, canonical path to project root
+path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+
+# absolute, canonical path to ReleaseTools library file
+path_to_rt_lib="${path_to_proj_root}/${path_to_rt_lib}"
+
+
+# -----------------------------------------------------------------------------
+# load ReleaseTools library
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_rt_lib}" 2>&1)"
+then
+    source "${path_to_rt_lib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run ReleaseTools boilerplate functions
+
+if ! get_script_args_opt_arg "${@}"; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont. 2
+
+# absolute, canonical path to the target project / repository root folder
+repo_root="$(realpath "${repo_root}")"
+
+# absolute path to target project configuration file
+# shellcheck disable=SC2154
+conf_file="${repo_root}/${path_to_target_conf}"
+
+# arguments passed to git (not to a sub-command) with every call
+git_args=('-C' "${repo_root}")
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+echo
+
+echo -n 'Load script configuration file: '
+# shellcheck disable=SC2154
+if output="$(yq read "${conf_file}" --tojson 2>&1)"
+then
+    echo 'OK'
+    config="${output}"
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+echo -n 'Extract script configuration attributes: '
+# TODO: remove once more attributes
+# shellcheck disable=SC2043
+for attr in version
+do
+    output="$(jq -r ".${attr}" <<< "${config}")"
+    # https://unix.stackexchange.com/a/68349
+    # https://unix.stackexchange.com/a/41418
+    if [ -n "${output}" ] && [ "${output}" != 'null' ]
+    then
+        declare "${attr}"="${output}"
+    else
+        echo 'ERROR'
+        echo "Failed to get ${attr} attribute from configuration"
+        exit 1
+    fi
+done
+echo 'OK'
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont. 3
+
+# shellcheck disable=SC2154
+major="$(jq -r '.major' <<< "${version}")"
+minor="$(jq -r '.minor' <<< "${version}")"
+patch="$(jq -r '.patch' <<< "${version}")"
+
+release_name="${major}.${minor}.${patch}"
 
 
 # -----------------------------------------------------------------------------
 # finish the release
 
-# name of the release in progress
-# TODO: this assumes there is only one local release branch at a time - which is
-# reasonable as git flow refuses to start a release if there is already one
-release_name="$(git branch | grep "^[*| ] ${branch_release_prefix}" | cut -d / -f 2)"
-
-if [ -z "${release_name}" ]
-then
-    echo "Failed to determine name of current release"
-    exit -1
-fi
-
-# TODO: see dd-upload-artifacts
-if [ "$(hostname)" = 'vm-build-nice' ]
-then
-    # shellcheck disable=SC2034
-    SSH_AUTH_SOCK='/home/bob.the.builder/.ssh/ssh_auth_sock'
-fi
-
-echo -n "Finish release ${release_name} in ${repo_root}: "
+echo
+echo "Finish release ${release_name} in ${repo_root}: "
+echo
 
 # http://stackoverflow.com/q/14531243
 # https://github.com/nvie/gitflow/pull/287
@@ -146,18 +165,6 @@ echo -n "Finish release ${release_name} in ${repo_root}: "
 # TODO: store value before setting it; restore after use
 export GIT_MERGE_AUTOEDIT=no
 # echo "GIT_MERGE_AUTOEDIT: ${GIT_MERGE_AUTOEDIT}"
-
-# TODO: this occurred while heavily debugging this on vm-build-nice;
-# not sure if it will occur again during regular operations:
-# dd-finish-release:
-#
-# Finish release 2016.24.04 in /tmp/workspace/TTTest_publish_ssc:
-# [: 1: Illegal number: -master
-# Branches 'master' and 'origin/master' have diverged.
-# And local branch 'master' is ahead of 'origin/master'.
-# Branches 'develop' and 'origin/develop' have diverged.
-# And local branch 'develop' is ahead of 'origin/develop'.
-# Fatal: Tag already exists and does not point to release branch 'release/2016.24.04'
 
 # TODO: on OS X, getopt fails if options such as the tag message contain spaces:
 #   flags:FATAL the available getopt does not support spaces in options
@@ -184,109 +191,122 @@ export GIT_MERGE_AUTOEDIT=no
 # TODO: investigate and recover from or prepare for
 # master and origin/master having diverged
 
-output=$(git flow release finish -m "${tag_message}" "${release_name}" 2>&1)
+# shellcheck disable=SC2154
+output=$(git "${git_args[@]}" flow release finish -m "${tag_message}" \
+                                                     "${release_name}" 2>&1)
 
 res="$?"
 
 # NOTE: there isn't really a need to use a while loop here;
 # this is just done for consistency with dd-start-release
 
-recovered=false
+# need extra variable to place shellcheck instruction
+# shellcheck disable=SC2154
+error_message="${err_msg_git_flow_init}"
 
 while [ "${res}" -ne 0 ]
 do
-    recovered=true
-    echo
-
     case "${output}" in
 
-        "${err_msg_git_flow_init}")
+        "${error_message}")
 
-            # NOTE: see dd-start-release for more information
+        # NOTE: see dd-start-release for more information
 
-            echo "Not a gitflow-enabled repo yet, need to run 'git flow init'."
-            echo "Verify preconditions for unattended 'git flow init' execution:"
-            echo
+        echo "Not a gitflow-enabled repo yet, need to run 'git flow init'."
+        echo "Verify preconditions for unattended 'git flow init' execution:"
+        echo
 
-            local_branches="$(git branch)"
+        local_branches="$(git "${git_args[@]}" branch)"
 
-            echo -n "Production release branch (${branch_master}): "
+        # shellcheck disable=SC2154
+        echo -n "Production release branch (${branch_master}): "
 
-            if echo "${local_branches}" | grep -q "${regex_master_local}"
+        # shellcheck disable=SC2154
+        if grep -q "${regex_master_local}" <<< "${local_branches}"
+        then
+            echo 'OK'
+        else
+            echo 'not found'
+            echo 'Attempt to check it out from default remote:'
+            remote_branches="$(git "${git_args[@]}" branch -r)"
+
+            # shellcheck disable=SC2154
+            if ! grep -q "${regex_master_remote}" <<< "${remote_branches}"
             then
-                echo 'OK'
+                # shellcheck disable=SC2154
+                msg="Failed to get ${branch_master} from ${remote_default_name}"
+                echo "${msg}"
+                exit 1
             else
-                echo 'not found'
-                echo 'Attempt to check it out from default remote:'
-                remote_branches="$(git branch -r)"
-
-                if echo "${remote_branches}" | grep -q "${regex_master_remote}"
+                echo "git checkout ${branch_master}"
+                if ! git "${git_args[@]}" checkout "${branch_master}"
                 then
-                    echo "git checkout ${branch_master}"
-                    git checkout "${branch_master}"
-                    res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
-                    echo
-                else
-                    echo "Failed to obtain ${branch_master} from ${remote_default_name}"
-                    exit -1
+                    exit 1
                 fi
-            fi
-
-            echo -n "Next release development branch (${branch_develop}): "
-
-            if echo "${local_branches}" | grep -q "${regex_develop_local}"
-            then
-                echo 'OK'
                 echo
-            else
-                echo 'not found'
-                echo 'Attempt to check it out from default remote:'
-                remote_branches="$(git branch -r)"
-
-                if echo "${remote_branches}" | grep -q "${regex_develop_remote}"
-                then
-                    echo "git checkout ${branch_develop}"
-                    git checkout "${branch_develop}"
-                    res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
-                    echo
-                else
-                    echo "Failed to obtain ${branch_develop} from ${remote_default_name}"
-                    exit -1
-                fi
             fi
+        fi
 
-            echo "Preconditions verified; run 'git flow init':"
+        # shellcheck disable=SC2154
+        echo -n "Next release development branch (${branch_develop}): "
 
-            git flow init -d
-            res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
-
+        # shellcheck disable=SC2154
+        if grep -q "${regex_develop_local}" <<< "${local_branches}"
+        then
+            echo 'OK'
             echo
-            echo "Again, finish release ${release_name} in ${repo_root}:"
+        else
+            echo 'not found'
+            echo 'Attempt to check it out from default remote:'
+            remote_branches="$(git "${git_args[@]}" branch -r)"
 
-            output=$(git flow release finish -m "${tag_message}" "${release_name}" 2>&1)
-            res="$?"
+            # shellcheck disable=SC2154
+            if ! grep -q "${regex_develop_remote}" <<< "${remote_branches}"
+            then
+                msg="Failed to get ${branch_develop} "
+                msg+="from ${remote_default_name}"
+                echo "${msg}"
+                exit 1
+            else
+                echo "git checkout ${branch_develop}"
+                if ! git "${git_args[@]}" checkout "${branch_develop}"
+                then
+                    exit 1
+                fi
+                echo
+            fi
+        fi
 
-            ;;
+        echo "Preconditions verified; run 'git flow init':"
+
+        # -d : use default branch names
+        if ! git "${git_args[@]}" flow init -d
+        then
+            exit 1
+        fi
+        echo
+
+        echo "Again, finish release ${release_name} in ${repo_root}:"
+
+        output=$(git "${git_args[@]}" flow release finish -m "${tag_message}" \
+                                        "${release_name}" 2>&1)
+        res=$?
+
+        ;;
+
 
         *)
-            # git flow release finish prints its own error messages
-            echo "${output}"
-            popd > /dev/null
-            exit "${res}"
+        # git flow release finish prints its own error messages
+        echo "${output}"
+        exit 1
     esac
 done
 
-if [ "${recovered}" = false ]
-then
-    echo 'OK'
-fi
-
 export GIT_MERGE_AUTOEDIT=
 
-
-popd > /dev/null
+echo "${output}"
 
 
 echo
-echo 'dd-finish-release: success'
+echo 'finishing release complete'
 echo

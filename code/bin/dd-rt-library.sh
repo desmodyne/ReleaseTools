@@ -75,6 +75,15 @@ branch_release_prefix='release'
 # name of default git repo remote
 remote_default_name='origin'
 
+# message for creating release tag
+# TODO: research what this is good for
+# TODO: add project and release names ?
+# TODO: on OSX, getopt fails on spaces, even
+# with extra / escaped single / double quotes:
+# https://github.com/nvie/gitflow/issues/98
+# TODO: does this also occur on on Linux ?
+tag_message='automatically_created_release_tag'
+
 
 # ------------------------------
 # paths to folders and filenames
