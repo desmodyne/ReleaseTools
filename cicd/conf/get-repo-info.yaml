@@ -1,0 +1,39 @@
+---
+# get-repo-info.yaml
+#
+# get-repo-info configuration file
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-10-07
+
+
+# string to indicate local, uncommitted changes, i.e. status = true
+dirty_string:          -DIRTY
+
+# string to fall back to if repo branch can not be determined
+no_branch_fallback:    NO BRANCH
+
+# string to fall back to if repo commit hash can not be determined
+no_commit_fallback:    NO COMMIT
+
+# string to fall back to if repo commit count can not be determined
+no_count_fallback:     ??
+
+# string to fall back to if repo remote can not be determined
+no_remote_fallback:    NO REMOTE
+
+# string to fall back to if repo semver can not be determined
+no_semver_fallback:    NO SEMVER
+
+# string to fall back to if repo stage can not be determined
+no_stage_fallback:     NO STAGE
+
+# string to fall back to if repo status can not be determined
+no_status_fallback:    true
+
+# string to fall back to if repo does not have any tags
+no_tag_fallback:       UNTAGGED
+
+# string to fall back to if repo version can not be determined
+no_version_fallback:   UNVERSIONED

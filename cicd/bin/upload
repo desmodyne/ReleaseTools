@@ -1,0 +1,343 @@
+#!/usr/bin/env bash
+
+# upload
+#
+# upload all artifacts of this project
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2017-05-26
+
+
+# NOTE: see build script for some possibly informative comments
+
+
+echo
+echo 'upload project artifacts'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+path_to_proj_root='../..'
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# path to script configuration file, relative to project root
+path_to_conf_file="cicd/conf/$(basename "${BASH_SOURCE[0]}").yaml"
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('curl' 'get-repo-info' 'jinja2' 'realpath' 'sha256sum')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
+
+# arguments for every curl call
+# http://stackoverflow.com/a/21109454
+curl_args=('--show-error' '--silent')
+
+
+# -----------------------------------------------------------------------------
+# load BashLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute, canonical path to project root
+path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+
+# absolute, canonical path to configuration file
+path_to_conf_file="${path_to_proj_root}/${path_to_conf_file}"
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+# shellcheck disable=SC2034
+attrs=(archive_path archive_tmpl brew_formula brew_repo_github_url
+       formula_folder homepage
+       git_ci_email git_ci_user git_msg_tmpl github_branch github_repo_url
+       path_to_brew_repo path_to_brew_tmpl path_to_local_tmp)
+# shellcheck disable=SC2034
+opt_attrs=()
+
+echo
+echo 'Load script configuration file:'
+if ! get_attrs_from_yaml_file "${path_to_conf_file}" attrs opt_attrs
+then
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute, canonical path to brew formula repository root
+path_to_brew_repo="$(realpath "${path_to_proj_root}/${path_to_brew_repo}")"
+
+# absolute, canonical path to brew formula template file
+path_to_brew_tmpl="${path_to_proj_root}/${path_to_brew_tmpl}"
+
+# absolute, canonical path to local temp upload folder
+path_to_local_tmp="${path_to_proj_root}/${path_to_local_tmp}"
+
+
+# -----------------------------------------------------------------------------
+# get git repository information
+
+# shellcheck disable=SC1091
+if ! source get-repo-info "${path_to_proj_root}"; then exit 1; fi
+
+# shellcheck disable=SC2154
+is_dirty="$(jq -r '.is_dirty' <<< "${repo_info}")"
+semver="$(  jq -r '.semver'   <<< "${repo_info}")"
+
+# TODO: test if local stage == master ?
+
+if [ "${is_dirty}" = 'true' ]
+then
+    echo 'ERROR: git repository is not a in clean state; will not upload'
+    echo
+    echo 'project artifacts upload complete'
+    echo
+
+    exit 1
+fi
+
+# TODO: get 'NO SEMVER' from .../cicd/conf/get-repo-info.yaml
+if [ "${semver}" = 'NO SEMVER' ]
+then
+    echo 'ERROR: git repository does not have a release semver; can not upload'
+    echo
+    echo 'project artifacts upload complete'
+    echo
+
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# sync github remote with gitlab remote
+
+# NOTE: depending on gitlab CI/CD configuration, repo might be in detached head
+# TODO: repo_info > branch seems to be HEAD at times and master at other times
+# shellcheck disable=SC2154
+ref_spec="HEAD:${github_branch}"
+
+echo -n "push repository ${github_branch} branch to github: "
+# shellcheck disable=SC2154
+if output="$(git push "${github_repo_url}" "${ref_spec}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+echo -n "push repository tag ${semver} to github: "
+if output="$(git push "${github_repo_url}" "${semver}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# render brew formula
+
+echo
+
+if [ ! -d "${path_to_local_tmp}" ]
+then
+    mkdir -p "${path_to_local_tmp}"
+fi
+
+# shellcheck disable=SC2059,SC2154
+archive_file="$(printf "${archive_tmpl}" "${semver}")"
+# shellcheck disable=SC2154
+archive_url="${homepage}/${archive_path}/${archive_file}"
+
+# https://stackoverflow.com/a/16363115
+if ! pushd "${path_to_local_tmp}" > /dev/null
+then
+    echo "Failed to pushd to local temp folder ${path_to_local_tmp}"
+    exit 1
+fi
+
+echo -n 'download release archive: '
+# NOTE: -L is required to follow redirections
+if output="$(curl "${curl_args[@]}" -OL "${archive_url}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+if ! popd > /dev/null
+then
+    echo "Failed to popd from local temp folder ${path_to_local_tmp}"
+    exit 1
+fi
+
+echo -n 'get release archive sha256 sum: '
+if output="$(sha256sum "${path_to_local_tmp}/${archive_file}" 2>&1)"
+then
+    echo 'OK'
+    sha256_sum="$(cut -d ' ' -f 1 <<< "${output}")"
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+# NOTE: these are not bash, but jq variables
+# shellcheck disable=SC2016
+json_tmpl='{ "archive_url": $archive_url, "homepage": '
+# shellcheck disable=SC2016
+json_tmpl+='$homepage, "sha256_sum": $sha256_sum }'
+
+tmpl_data="$(jq -n --arg archive_url "${archive_url}"   \
+                   --arg homepage    "${homepage}"      \
+                   --arg sha256_sum  "${sha256_sum}" "${json_tmpl}")"
+
+echo -n 'render brew formula template: '
+# shellcheck disable=SC2154
+if output="$(jinja2 --format=json                                       \
+                    --outfile="${path_to_local_tmp}/${brew_formula}"    \
+                    --strict "${path_to_brew_tmpl}" <<< "${tmpl_data}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# set up local brew formula repo
+
+echo
+
+# TODO: the remote on github is the one currently used; the remote on gitlab
+# has an entirely different history that might have to be merged somehow
+
+# NOTE: git usually displays its own output
+
+if [ -d "${path_to_brew_repo}" ]
+then
+    echo 'update brew formula repository:'
+    # shellcheck disable=SC2154
+    if ! git -C "${path_to_brew_repo}" fetch "${brew_repo_github_url}" &&
+         git -C "${path_to_brew_repo}" pull  "${brew_repo_github_url}"
+    then
+        exit 1
+    fi
+else
+    echo 'clone brew formula repository:'
+    if ! git clone "${brew_repo_github_url}" "${path_to_brew_repo}"
+    then
+        exit 1
+    fi
+
+    # TODO: use ReleaseTools > dd-rt-verify-user-configuration for this
+    # TODO: no output if successful, no idea about output if error
+    echo -n 'configure git user and email: '
+    # shellcheck disable=SC2154
+    if git -C "${path_to_brew_repo}" config user.email "${git_ci_email}" &&
+       git -C "${path_to_brew_repo}" config user.name  "${git_ci_user}"
+    then
+        echo 'OK'
+    else
+        echo 'ERROR'
+        exit 1
+    fi
+fi
+
+
+# -----------------------------------------------------------------------------
+# upload project artifacts
+
+echo
+
+echo -n 'copy brew formula to repository: '
+# shellcheck disable=SC2154
+if output="$(cp "${path_to_local_tmp}/${brew_formula}"     \
+                "${path_to_brew_repo}/${formula_folder}/" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+echo -n 'stage brew formula in repository: '
+if output="$(git -C  "${path_to_brew_repo}" \
+                 add "${formula_folder}/${brew_formula}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+# shellcheck disable=SC2059,SC2154
+git_msg="$(printf "${git_msg_tmpl}" "${semver}")"
+
+echo -n 'commit brew formula to repository: '
+if output="$(git -C "${path_to_brew_repo}" commit -m "${git_msg}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+echo -n 'push brew formula repository to remote: '
+if output="$(git -C "${path_to_brew_repo}" push 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+
+echo
+echo 'project artifacts upload complete'
+echo
