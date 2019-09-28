@@ -1,0 +1,228 @@
+#!/usr/bin/env bash
+
+# dd-rt-create-release-notes
+#
+# create release notes
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-06-03
+
+
+# NOTE: see also ./dd-rt-release
+
+
+# TODO: this should be done later, so hotfixes are also mentioned
+
+
+echo
+echo 'create release notes'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+path_to_proj_root='../..'
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# path to ReleaseTools library file, relative to project root
+path_to_rt_lib='code/bin/dd-rt-library.sh'
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('git' 'jq' 'realpath')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=()
+
+
+# -----------------------------------------------------------------------------
+# load BashLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute, canonical path to project root
+path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+
+# absolute, canonical path to ReleaseTools library file
+path_to_rt_lib="${path_to_proj_root}/${path_to_rt_lib}"
+
+
+# -----------------------------------------------------------------------------
+# load ReleaseTools library
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_rt_lib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_rt_lib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run ReleaseTools boilerplate functions
+
+if ! get_script_args "${@}"; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute, canonical path to the target project / repository root folder
+repo_root="$(realpath "${repo_root}")"
+
+# absolute path to target project configuration file
+# shellcheck disable=SC2154
+path_to_conf_file="${repo_root}/${path_to_target_conf}"
+
+# absolute path to release notes folder
+# shellcheck disable=SC2154
+path_to_release_notes="${repo_root}/${path_to_release_notes}"
+
+# arguments passed to git (not to a sub-command) with every call
+git_args=('-C' "${repo_root}")
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+# shellcheck disable=SC2034
+attrs=(version)
+# shellcheck disable=SC2034
+opt_attrs=()
+
+echo
+echo 'Load script configuration file:'
+if ! get_attrs_from_yaml_file "${path_to_conf_file}" attrs opt_attrs
+then
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# shellcheck disable=SC2154
+major="$(jq -r '.major' <<< "${version}")"
+minor="$(jq -r '.minor' <<< "${version}")"
+patch="$(jq -r '.patch' <<< "${version}")"
+
+release_name="${major}.${minor}.${patch}"
+
+
+# -----------------------------------------------------------------------------
+# create release notes
+
+echo
+echo "Create notes for release ${release_name} in ${repo_root}:"
+
+# create output folder if required
+if [ ! -d "${path_to_release_notes}" ]
+then
+    mkdir -p "${path_to_release_notes}"
+fi
+
+# get commit SHA1 hashes of previous and this release branch
+# TODO: make master and HEAD configurable ?
+prev_release="$(git "${git_args[@]}" rev-parse --verify master)"
+this_release="$(git "${git_args[@]}" rev-parse --verify HEAD)"
+
+# TODO: use dd-date for this
+# shellcheck disable=SC2154
+timestamp="$(date "${release_notes_date_format}")"
+
+# render release notes filename
+# shellcheck disable=SC2059,SC2154
+release_notes_file="$(printf "${release_notes_tmpl}" \
+                             "${timestamp}" "${release_name}")"
+
+path_to_release_notes_file="${path_to_release_notes}/${release_notes_file}"
+
+
+# TODO: --format=format:<string> ?
+# TODO: internal / external release notes ?
+# TODO: make order and format configurable ?
+
+# http://stackoverflow.com/a/2099492
+echo -n 'Get details of commits to go into release: '
+# shellcheck disable=SC2154
+if output="$(git "${git_args[@]}" rev-list --topo-order --format=fuller \
+               "${prev_release}..${this_release}")"
+then
+    echo 'OK'
+    release_notes="${output}"
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+echo -n 'Save commit details to release notes file: '
+if output="$(echo "${release_notes}" | awk '$0="    "$0' \
+              > "${path_to_release_notes_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+echo -n 'Stage changes to release notes file: '
+if output="$(git "${git_args[@]}" add "${path_to_release_notes_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+# shellcheck disable=SC2059,SC2154
+commit_msg="$(printf "${commit_msg_release_tmpl}" "${release_name}")"
+
+echo -n 'Commit changes to conf file: '
+# shellcheck disable=SC2154
+if output="$(git "${git_args[@]}" commit \
+               -m "${commit_msg}" "${path_to_release_notes_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+
+echo
+echo 'release notes creation complete'
+echo

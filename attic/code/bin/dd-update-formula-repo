@@ -1,0 +1,310 @@
+#!/usr/bin/env bash
+
+# dd-update-formula-repo
+#
+# commit brew package formula changes to formula repo
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-07-10
+
+
+echo
+echo 'dd-update-formula-repo:'
+echo
+
+
+# -----------------------------------------------------------------------------
+# determine platform: http://stackoverflow.com/a/18434831
+
+# NOTE: technically, brew packages can be built on Linux as much as on OS X;
+# restricting execution platforms to OS X here keeps things a lot simpler:
+# if this runs on OS X only, we will not encounter both brew and Debian packages
+
+case "${OSTYPE}" in
+    darwin*)
+        sed='gsed'
+        ;;
+    *)
+        echo "Unsupported operating system: ${OSTYPE}"
+        exit -1
+        ;;
+esac
+
+
+# -----------------------------------------------------------------------------
+# process command line arguments
+
+if [ $# -ne 1 ]
+then
+    echo "Usage: $(basename "$0") <repository root folder>"
+    exit -1
+else
+    if [ ! -e "$1" ]
+    then
+        echo "$1: No such file or directory"
+        exit -1
+    fi
+    if [ ! -d "$1" ]
+    then
+        echo "$1: Not a directory"
+        exit -1
+    fi
+fi
+
+
+# TODO: error handling; access project config file only once
+# TODO: prevent processing repo this file is in during development ?
+# TODO: verify required executables are available before using them ?
+# TODO: script return value when run as Jenkins job ?!?
+# TODO: major conf effort to get archive name; any better way ?
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+path_to_project_root='../../../..'
+
+# absolute path to the root folder of the repository to process
+# on Debian, install realpath using e.g. aptitude install realpath
+# on OS X, use grealpath: http://apple.stackexchange.com/a/88812
+repo_root="$(realpath "$1")"
+
+# absolute path to target project configuration
+project_conf="${repo_root}/project.conf"
+
+if [ ! -e "${project_conf}" ]
+then
+    echo "Failed to find project configuration ${project_conf}"
+    exit 1
+fi
+
+# name of target project
+project_name="$(jq -r '.Project' "${project_conf}")"
+
+# major minor patch project / package version
+major_version="$(jq -r '.Version.major' "${project_conf}")"
+minor_version="$(jq -r '.Version.minor' "${project_conf}")"
+patch_version="$(jq -r '.Version.patch' "${project_conf}")"
+
+# brew package version
+version="${major_version}.${minor_version}.${patch_version}"
+
+# brew formula folder, relative to target project root
+formula_folder='tmp/formula'
+
+# brew formula file name glob
+formula_glob="*.rb"
+
+# brew formula repo git URL; must use SSH for key-based access
+# TODO: don't hardcode gitlab username; eliminate or get from elsewhere
+# TODO: don't hardcode any of this - get from project conf instead
+formula_repo_url='https://dd-ssc@gitlab.com/DesmoDyne/Homebrew/Tools.git'
+
+# path to brew formula project base, relative to root folder of this project;
+# this is the folder into which all formula git repos are cloned to locally
+# NOTE: it would make things a lot easier if this folder was relative to the
+# target project root folder, but that location is passed in here as command
+# line argument and must be considered arbitrary for current and future projects
+path_to_formula_project_base='../../../DesmoDyne'
+
+# path to brew formula repo root folder, relative to brew formula project base
+# TODO: this is constant only for as long as there are only Tools brew packages
+path_to_formula_repo_root='Homebrew/Tools'
+
+# path to brew formula folder, relative to brew formula repo root;
+# defined by homebrew as either empty, 'Formula' or 'HomebrewFormula':
+# https://github.com/Homebrew/brew/blob/master/docs/ ...
+#  ... How-to-Create-and-Maintain-a-Tap.md#creating-a-tap
+path_to_formula_folder='Formula'
+
+# regex for version entry in formula
+version_regex='version "\d\+\.\d\+\.\d\+"'
+
+# sed expression for version entry in formula
+version_sedex='s|[[:space:]]*version[[:space:]]\+'
+version_sedex+='"\([[:digit:]]\+\.[[:digit:]]\+\.[[:digit:]]\+\)"|\1|g'
+
+# message template for committing changes to brew formula
+# TODO: rendered message must not get longer than 72 characters:
+# 123456789012345678901234567890123456789012345678901234567890123456789012
+# sample rendered commit message:
+# [#1]: update formula for DesmoDyne ReleaseTools version 0.2.3
+commit_msg_tmpl='[#1]: update formula for DesmoDyne %s version %s'
+
+# (last line in) git commit response when there are no changes to commit
+git_response='nothing to commit, working directory clean'
+
+# absolute path to brew formula repo root
+brew_repo_root="${path_to_this_script}/${path_to_project_root}/"
+brew_repo_root+="${path_to_formula_project_base}/${path_to_formula_repo_root}"
+brew_repo_root="$(realpath "${brew_repo_root}")"
+
+
+# -----------------------------------------------------------------------------
+# update brew package formula repo
+
+
+if [ ! -d "${brew_repo_root}" ]
+then
+    # clone git repo if it does not exist yet
+    echo 'Clone brew package formula git repo:'
+    echo "git clone ${formula_repo_url} ${brew_repo_root}"
+    git clone "${formula_repo_url}" "${brew_repo_root}"
+    res="$?"; if [ "${res}" -ne 0 ]; then exit "${res}"; fi
+fi
+
+# TODO: in the end, the brew formula repo must run automatically in parallel to
+# the project repo: create feature branches, merge them to develop, create
+# releases, publish them, etc.; this can only be accomplished by a mechanism
+# beyond the scope of this script, e.g. git hooks, and might get tricky
+# considering every formula repo may contain any number of package formulas...
+
+# TODO: homebrew does not support anything but a master branch in formula repos
+# and keeps switching it back to that branch; a 1:1 project:formula repo branch
+# is possible, but pointless; establish a convention how to deal with this
+
+# git branches of the two repositories involved
+formula_branch=$(git -C "${brew_repo_root}" \
+                     rev-parse --symbolic-full-name --abbrev-ref HEAD)
+project_branch=$(git -C "${repo_root}" \
+                     rev-parse --symbolic-full-name --abbrev-ref HEAD)
+
+msgtmpl='Project repository at %s\n  is on branch %s;\n'
+msgtmpl+='formula repository at %s\n  is on branch %s'
+# shellcheck disable=SC2059
+message="$(printf "${msgtmpl}" "${repo_root}"      "${project_branch}" \
+                               "${brew_repo_root}" "${formula_branch}")"
+echo -n "${message}"
+
+if [ "${project_branch}" = "${formula_branch}" ]
+then
+    echo ': OK'
+    echo
+else
+    echo
+    echo 'Project and brew formula repositories are on different branches;'
+    echo 'please align them, then run this script again. Sorry about that.'
+    exit -1
+fi
+
+
+# TODO: test if repo is in sync with origin; update if not
+# git status ...
+
+
+# change to brew formula repo root
+pushd "${brew_repo_root}" > /dev/null
+
+
+source_file_glob="${repo_root}/${formula_folder}/${formula_glob}"
+# shellcheck disable=SC2086
+source_file="$(ls ${source_file_glob})"
+
+number_of_source_files="$(echo "${source_file}" | wc -l)"
+
+if [ "${number_of_source_files}" -eq 0 ]
+then
+    echo "Failed to find a brew formula in ${repo_root}/${formula_folder}"
+    popd > /dev/null
+    exit -1
+fi
+
+if [ "${number_of_source_files}" -gt 1 ]
+then
+    echo "Found more than one brew formula:"
+    echo "${source_file}"
+    popd > /dev/null
+    exit -1
+fi
+
+if ! version_line="$(grep "${version_regex}" "${source_file}")"
+then
+    echo "Failed to find version info in formula:"
+    echo "${source_file}"
+    popd > /dev/null
+    exit -1
+fi
+
+formula_version="$(echo "${version_line}" | "${sed}" "${version_sedex}")"
+
+# TODO: also compare against latest git tag ?
+if [ "${formula_version}" != "${version}" ]
+then
+    msg="Version in brew formula ${formula_version} "
+    msg+="does not match project version ${version}"
+    echo "${msg}"
+    popd > /dev/null
+    exit -1
+fi
+
+target_folder="${path_to_formula_folder}"
+
+message="$(printf 'Copy brew formula\n   %s\nto %s : ' \
+                  "${source_file}"                     \
+                  "$(realpath "${brew_repo_root}/${target_folder}")/")"
+echo -n "${message}"
+cp "${source_file}" "${target_folder}"
+res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+echo 'OK'
+echo
+
+# add changes to git repository
+# TODO: error handling ? get log output ?
+
+# git prints its own error messages
+
+echo -n 'Stage changes: '
+# TODO: git add formula only
+git add "${target_folder}"
+res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+echo 'OK'
+echo
+
+
+# render commit message template
+commit_message="$(printf "${commit_msg_tmpl}" "${project_name}" "${version}")"
+
+echo 'Commit changes:'
+output="$(git commit --message "${commit_message}")"
+
+res="$?"
+
+do_push_changes=true
+
+# git does not seem to support
+# specific return codes per error:
+# http://stackoverflow.com/q/4917871
+
+if [ "${res}" -ne 0 ]
+then
+    # https://github.com/koalaman/shellcheck/wiki/SC2143
+    if echo "${output}" | grep -q "${git_response}"
+    then
+        echo "${output}"
+        do_push_changes=false
+    else
+        echo "${output}"
+        popd > /dev/null
+        exit "${res}"
+    fi
+fi
+
+if [ "${do_push_changes}" = true ]
+then
+    echo 'Push changes:'
+    git push origin
+    res="$?"; if [ "${res}" -ne 0 ]; then popd > /dev/null; exit "${res}"; fi
+fi
+
+# change back to previous location
+popd > /dev/null
+
+
+echo
+echo "dd-update-formula-repo: success"
+echo

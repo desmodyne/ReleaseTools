@@ -1,0 +1,87 @@
+# release-tools.rb
+#
+# ReleaseTools brew formula
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-06-06
+
+
+# http://apple.stackexchange.com/a/97205
+# https://github.com/Homebrew/brew/blob/master/docs/README.md
+# https://github.com/Homebrew/brew/blob/master/docs/Formula-Cookbook.md
+# https://github.com/Homebrew/brew/blob/master/docs/How-to-Create-and-Maintain-a-Tap.md
+# https://docs.brew.sh
+
+
+# formula file and Ruby class name concept:
+# https://github.com/Homebrew/brew/blob/master/ ...
+#  ... docs/Formula-Cookbook.md#a-quick-word-on-naming
+
+class ReleaseTools < Formula
+  # TODO: get this from PackageDescription.txt
+  desc "DesmoDyne ReleaseTools"
+  # TODO: create wiki page and add link
+  homepage "https://gitlab.com/DesmoDyne/Tools/ReleaseTools"
+  # NOTE: this is a private brew package repo referencing a private source repo;
+  # downloading a package from the source repo fails with error message
+  #   curl: (22) The requested URL returned error: 401 Unauthorized
+  # unless private_token=... request parameter is appended
+  # TODO: improve / align access to the brew repo currently granted by ~/.netrc:
+  # https://gist.github.com/mlafeldt/8e7d50ee0b1de44e256d
+  # TODO: this exposes the ansible private gitlab token; do this differently,
+  # e.g. using a GitLab version of brew GitHub support: see e.g.
+  #   https://github.com/Homebrew/brew/blob/master/Library/Homebrew/ ...
+  #    ... download_strategy.rb > GitHubPrivateRepositoryDownloadStrategy and
+  #    ... github.com/Homebrew/brew/blob/master/Library/Homebrew/utils/github.rb
+
+  # WARNING: These posts are incomplete and probably outdated or plain wrong:
+  # https://wheniwork.engineering/ ...
+  #  ... creating-a-private-homebrew-tap-with-gitlab-8800c453d893
+  # https://vanwollingen.nl/ ...
+  #  ... distributing-private-tools-through-homebrew-d046761fb3a1a
+
+  # NOTE: installation / download can be tested using local formula using e.g.
+  #   GITLAB_HOMEBREW_TOKEN=<snip> brew install --build-from-source ...
+  #     ... <path to repo root>/HomebrewTools/Formula/release-tools.rb
+  # https://github.com/Homebrew/brew/issues/1468
+  # UPDATE: the above does not work, env var is not picked up in brew formula;
+  # tested this thoroughly, the Ruby code as such is good, but still won;t work
+  #
+  # as an alternative, implement GitLabPrivateRepositoryDownloadStrategy
+  # following GitHub example:
+  #   https://github.com/Homebrew/brew/pull/1763
+  #   https://github.com/Homebrew/brew/pull/1763/files
+
+  url "{{ url }}"
+  sha256 "{{ sha256 }}"
+  # TODO: investigate ways to better deal with dev / feature branch versions
+  # head "https://gitlab.com/DesmoDyne/Tools/ReleaseTools", :branch => "feature/8/align_brew_deployment"
+  version "{{ version }}"
+
+  # required to update default bash 3 to version 4
+  depends_on "bash"
+  # contains realpath and other GNU shell utilities
+  depends_on "coreutils"
+  # more in line with Linux versions than git-flow;
+  # git is installed per default on recent macOS versions
+  # and git-flow-avh does not list it as dependency
+  depends_on "git-flow-avh"
+  # GNU version of grep named ggrep in brew
+  depends_on "grep"
+  # command-line JSON processor
+  depends_on "jq"
+
+  # TODO: find a way to auto-install j2 Python pip package
+
+  # TODO: is ./ in front of file paths really required ?
+  def install
+{% for filename in install %}    bin.install "./{{ filename }}"{% if not loop.last %}
+{% endif %}{% endfor %}
+  end
+
+  # TODO: test: https://github.com/Homebrew/brew/blob/master/docs/ ...
+  #              ... Formula-Cookbook.md#add-a-test-to-the-formula
+
+end
+

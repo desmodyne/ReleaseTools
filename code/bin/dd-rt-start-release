@@ -1,0 +1,330 @@
+#!/usr/bin/env bash
+
+# dd-rt-start-release
+#
+# start a software release
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-06-01
+
+
+# NOTE: see also ./dd-rt-release
+
+
+echo
+echo 'start release'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+path_to_proj_root='../..'
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# path to ReleaseTools library file, relative to project root
+path_to_rt_lib='code/bin/dd-rt-library.sh'
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('git' 'jq' 'realpath')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=()
+
+
+# -----------------------------------------------------------------------------
+# load BashLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute, canonical path to project root
+path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+
+# absolute, canonical path to ReleaseTools library file
+path_to_rt_lib="${path_to_proj_root}/${path_to_rt_lib}"
+
+
+# -----------------------------------------------------------------------------
+# load ReleaseTools library
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_rt_lib}" 2>&1)"
+then
+    source "${path_to_rt_lib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run ReleaseTools boilerplate functions
+
+if ! get_script_args_opt_arg "${@}"; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute, canonical path to the target project / repository root folder
+repo_root="$(realpath "${repo_root}")"
+
+# absolute path to target project configuration file
+# shellcheck disable=SC2154
+path_to_conf_file="${repo_root}/${path_to_target_conf}"
+
+# arguments passed to git (not to a sub-command) with every call
+git_args=('-C' "${repo_root}")
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+# shellcheck disable=SC2034
+attrs=(version)
+# shellcheck disable=SC2034
+opt_attrs=()
+
+echo
+echo 'Load script configuration file:'
+if ! get_attrs_from_yaml_file "${path_to_conf_file}" attrs opt_attrs
+then
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# resolve file / json element references
+# TODO: refactor this to elsewhere and use JSON reference standard:
+# https://json-schema.org/understanding-json-schema/structuring.html
+# https://swagger.io/docs/specification/using-ref
+
+# if [ "$(echo "${version}" | jq -r '. | keys[]')" = '_include' ]
+# then
+#     # semver in modular configuration
+#
+#     reference="$(echo "${version}" | jq -r '._include')"
+#     file_ref="$(echo "${reference}" | cut -d : -f 1)"
+#     json_ref="$(echo "${reference}" | cut -d : -f 2)"
+#     version="$(jq ".${json_ref}" "${path_to_proj_conf_folder}/${file_ref}")"
+#
+#     path_to_version_conf="$(realpath "${path_to_proj_conf_folder}/${file_ref}")"
+#
+#     major="$(echo "${version}" | jq -r '.major')"
+#     minor="$(echo "${version}" | jq -r '.minor')"
+#     patch="$(echo "${version}" | jq -r '.patch')"
+# fi
+
+# shellcheck disable=SC2154
+major="$(jq -r '.major' <<< "${version}")"
+minor="$(jq -r '.minor' <<< "${version}")"
+patch="$(jq -r '.patch' <<< "${version}")"
+
+# if no explicit version is passed as cmd line arg,
+# increment the one defined in project > version conf
+# shellcheck disable=SC2154
+if [ -z "${semver}" ]
+then
+    patch=$((patch + 1))
+    release_name="${major}.${minor}.${patch}"
+
+# otherwise validate the cmd line arg and use it if valid
+else
+    current_semver="${major}.${minor}.${patch}"
+
+    # TODO: handle leading zeroes in cmd line arg ?
+    if [[ ! "${semver}" > "${current_semver}" ]]
+    then
+        # shellcheck disable=SC2059
+        msg="$(printf "${err_msg_git_conf}" \
+                      "${semver}" "${current_semver}" "${path_to_conf_file}")"
+        echo "${msg}"
+        exit 1
+    fi
+
+    release_name="${semver}"
+fi
+
+
+# -----------------------------------------------------------------------------
+# start the release
+
+echo
+echo "Start release ${release_name} in ${repo_root}:"
+echo
+
+# this assumes git prints to either stdout or stderr,
+# but not both - and sets a corresponding return value
+output=$(git "${git_args[@]}" flow release start "${release_name}" 2>&1)
+
+# TODO: deal with _release_ (not _tag_) already existing, e.g.
+# Fatal: Branch 'release/2016.24.02' already exists. Pick another name.
+
+res=$?
+
+# need extra variable to place shellcheck instruction
+# shellcheck disable=SC2154
+error_message="${err_msg_git_flow_init}"
+
+while [ "${res}" -ne 0 ]
+do
+    case "${output}" in
+
+        "${error_message}")
+
+        # NOTE: git flow init requires local develop and master branches to be
+        # present locally to auto-select them for fully unattended execution
+
+        # TODO: the above does not seem to be the case for a brand new repo:
+        # ssc@vm-build-debian-stable-ssc:~$ cd /tmp
+        # ssc@vm-build-debian-stable-ssc:/tmp$ mkdir test
+        # ssc@vm-build-debian-stable-ssc:/tmp$ cd test
+        # ssc@vm-build-debian-stable-ssc:/tmp/test$ git init
+        # Initialized empty Git repository in /tmp/test/.git/
+        # ssc@vm-build-debian-stable-ssc:/tmp/test$ git flow init -d
+        # Using default branch names.
+        # No branches exist yet. Base branches must be created now.
+        # Branch name for production releases: [master]
+        # Branch name for "next release" development: [develop]
+        #
+        # How to name your supporting branch prefixes?
+        # Feature branches? [feature/]
+        # Release branches? [release/]
+        # Hotfix branches? [hotfix/]
+        # Support branches? [support/]
+        # Version tag prefix? []
+        # Hooks and filters directory? [/tmp/test/.git/hooks]
+
+        echo "Not a gitflow-enabled repo yet, need to run 'git flow init'."
+        echo "Verify preconditions for unattended 'git flow init' execution:"
+        echo
+
+        local_branches="$(git "${git_args[@]}" branch)"
+
+        # NOTE: bash regex doesn't seem to support matching
+        # line ends within a multi-line search string:
+        # if [[ "${local_branches}" =~ "${regex_master_local}" ]]
+
+        # shellcheck disable=SC2154
+        echo -n "Production release branch (${branch_master}): "
+
+        # https://github.com/koalaman/shellcheck/wiki/SC2143
+        # shellcheck disable=SC2154
+        if grep -q "${regex_master_local}" <<< "${local_branches}"
+        then
+            echo 'OK'
+        else
+            echo 'not found'
+            echo 'Attempt to check it out from default remote:'
+            remote_branches="$(git "${git_args[@]}" branch -r)"
+
+            # need to test if remote branch exists first in order not to create
+            # a new independent branch or get into a  'detached HEAD' state
+            # shellcheck disable=SC2154
+            if ! grep -q "${regex_master_remote}" <<< "${remote_branches}"
+            then
+                # shellcheck disable=SC2154
+                msg="Failed to get ${branch_master} from ${remote_default_name}"
+                echo "${msg}"
+                exit 1
+            else
+                echo "git checkout ${branch_master}"
+                if ! git "${git_args[@]}" checkout "${branch_master}"
+                then
+                    exit 1
+                fi
+                echo
+            fi
+        fi
+
+        # shellcheck disable=SC2154
+        echo -n "Next release development branch (${branch_develop}): "
+
+        # shellcheck disable=SC2154
+        if grep -q "${regex_develop_local}" <<< "${local_branches}"
+        then
+            echo 'OK'
+            echo
+        else
+            echo 'not found'
+            echo 'Attempt to check it out from default remote:'
+            remote_branches="$(git "${git_args[@]}" branch -r)"
+
+            # need to test if remote branch exists first in order not to create
+            # a new independent branch or get into a 'detached HEAD' state
+            # shellcheck disable=SC2154
+            if ! grep -q "${regex_develop_remote}" <<< "${remote_branches}"
+            then
+                msg="Failed to get ${branch_develop} "
+                msg+="from ${remote_default_name}"
+                echo "${msg}"
+                exit 1
+            else
+                echo "git checkout ${branch_develop}"
+                if ! git "${git_args[@]}" checkout "${branch_develop}"
+                then
+                    exit 1
+                fi
+                echo
+            fi
+        fi
+
+        echo "Preconditions verified; run 'git flow init':"
+
+        # -d : use default branch names
+        if ! git "${git_args[@]}" flow init -d
+        then
+            exit 1
+        fi
+        echo
+
+        echo "Again, start release ${release_name} in ${repo_root}:"
+
+        output=$(git "${git_args[@]}" flow release start "${release_name}" 2>&1)
+        res=$?
+
+        ;;
+
+
+        *)
+        # git flow release start prints its own error messages
+        echo "${output}"
+        exit 1
+    esac
+done
+
+echo "${output}"
+
+
+echo
+echo 'starting release complete'
+echo

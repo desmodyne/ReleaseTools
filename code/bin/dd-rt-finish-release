@@ -1,0 +1,291 @@
+#!/usr/bin/env bash
+
+# dd-rt-finish-release
+#
+# finish a software release
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-06-04
+
+
+# NOTE: see also ./dd-rt-release
+
+
+echo
+echo 'finish release'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+path_to_proj_root='../..'
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# path to ReleaseTools library file, relative to project root
+path_to_rt_lib='code/bin/dd-rt-library.sh'
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('git' 'jq' 'realpath')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=()
+
+
+# -----------------------------------------------------------------------------
+# load BashLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute, canonical path to project root
+path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+
+# absolute, canonical path to ReleaseTools library file
+path_to_rt_lib="${path_to_proj_root}/${path_to_rt_lib}"
+
+
+# -----------------------------------------------------------------------------
+# load ReleaseTools library
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_rt_lib}" 2>&1)"
+then
+    source "${path_to_rt_lib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run ReleaseTools boilerplate functions
+
+if ! get_script_args_opt_arg "${@}"; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute, canonical path to the target project / repository root folder
+repo_root="$(realpath "${repo_root}")"
+
+# absolute path to target project configuration file
+# shellcheck disable=SC2154
+path_to_conf_file="${repo_root}/${path_to_target_conf}"
+
+# arguments passed to git (not to a sub-command) with every call
+git_args=('-C' "${repo_root}")
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+# shellcheck disable=SC2034
+attrs=(version)
+# shellcheck disable=SC2034
+opt_attrs=()
+
+echo
+echo 'Load script configuration file:'
+if ! get_attrs_from_yaml_file "${path_to_conf_file}" attrs opt_attrs
+then
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# shellcheck disable=SC2154
+major="$(jq -r '.major' <<< "${version}")"
+minor="$(jq -r '.minor' <<< "${version}")"
+patch="$(jq -r '.patch' <<< "${version}")"
+
+release_name="${major}.${minor}.${patch}"
+
+
+# -----------------------------------------------------------------------------
+# finish the release
+
+echo
+echo "Finish release ${release_name} in ${repo_root}: "
+echo
+
+# http://stackoverflow.com/q/14531243
+# https://github.com/nvie/gitflow/pull/287
+# echo "GIT_MERGE_AUTOEDIT: ${GIT_MERGE_AUTOEDIT}"
+# TODO: store value before setting it; restore after use
+export GIT_MERGE_AUTOEDIT=no
+# echo "GIT_MERGE_AUTOEDIT: ${GIT_MERGE_AUTOEDIT}"
+
+# TODO: on OS X, getopt fails if options such as the tag message contain spaces:
+#   flags:FATAL the available getopt does not support spaces in options
+# workaround does not fix this either: https://github.com/nvie/gitflow/issues/98
+# brew install gnu-getopt
+# FLAGS_GETOPT_CMD: /usr/local/opt/gnu-getopt/bin/getopt
+# alexa:bin ssc$ /usr/local/opt/gnu-getopt/bin/getopt --version
+# getopt (enhanced) 1.1.6
+# alexa:bin ssc$ which getopt
+# /usr/bin/getopt
+# alexa:bin ssc$ /usr/bin/getopt --version
+#  --
+#
+# echo "FLAGS_GETOPT_CMD: ${FLAGS_GETOPT_CMD}"
+# export FLAGS_GETOPT_CMD="$(brew --prefix gnu-getopt)/bin/getopt"
+# echo "FLAGS_GETOPT_CMD: ${FLAGS_GETOPT_CMD}"
+
+# NOTE: in git, -m and --message are equivalent;
+# git flow fails on the long version --message:
+# flags:WARN getopt: illegal option -- -
+#  -m essage -- automatically_created_release_tag 2016.21
+# flags:FATAL unable to parse provided options with getopt.
+
+# TODO: investigate and recover from or prepare for
+# master and origin/master having diverged
+
+# shellcheck disable=SC2154
+output=$(git "${git_args[@]}" flow release finish -m "${tag_message}" \
+                                                     "${release_name}" 2>&1)
+
+res="$?"
+
+# NOTE: there isn't really a need to use a while loop here;
+# this is just done for consistency with dd-rt-start-release
+
+# need extra variable to place shellcheck instruction
+# shellcheck disable=SC2154
+error_message="${err_msg_git_flow_init}"
+
+while [ "${res}" -ne 0 ]
+do
+    case "${output}" in
+
+        "${error_message}")
+
+        # NOTE: see dd-rt-start-release for more information
+
+        echo "Not a gitflow-enabled repo yet, need to run 'git flow init'."
+        echo "Verify preconditions for unattended 'git flow init' execution:"
+        echo
+
+        local_branches="$(git "${git_args[@]}" branch)"
+
+        # shellcheck disable=SC2154
+        echo -n "Production release branch (${branch_master}): "
+
+        # shellcheck disable=SC2154
+        if grep -q "${regex_master_local}" <<< "${local_branches}"
+        then
+            echo 'OK'
+        else
+            echo 'not found'
+            echo 'Attempt to check it out from default remote:'
+            remote_branches="$(git "${git_args[@]}" branch -r)"
+
+            # shellcheck disable=SC2154
+            if ! grep -q "${regex_master_remote}" <<< "${remote_branches}"
+            then
+                # shellcheck disable=SC2154
+                msg="Failed to get ${branch_master} from ${remote_default_name}"
+                echo "${msg}"
+                exit 1
+            else
+                echo "git checkout ${branch_master}"
+                if ! git "${git_args[@]}" checkout "${branch_master}"
+                then
+                    exit 1
+                fi
+                echo
+            fi
+        fi
+
+        # shellcheck disable=SC2154
+        echo -n "Next release development branch (${branch_develop}): "
+
+        # shellcheck disable=SC2154
+        if grep -q "${regex_develop_local}" <<< "${local_branches}"
+        then
+            echo 'OK'
+            echo
+        else
+            echo 'not found'
+            echo 'Attempt to check it out from default remote:'
+            remote_branches="$(git "${git_args[@]}" branch -r)"
+
+            # shellcheck disable=SC2154
+            if ! grep -q "${regex_develop_remote}" <<< "${remote_branches}"
+            then
+                msg="Failed to get ${branch_develop} "
+                msg+="from ${remote_default_name}"
+                echo "${msg}"
+                exit 1
+            else
+                echo "git checkout ${branch_develop}"
+                if ! git "${git_args[@]}" checkout "${branch_develop}"
+                then
+                    exit 1
+                fi
+                echo
+            fi
+        fi
+
+        echo "Preconditions verified; run 'git flow init':"
+
+        # -d : use default branch names
+        if ! git "${git_args[@]}" flow init -d
+        then
+            exit 1
+        fi
+        echo
+
+        echo "Again, finish release ${release_name} in ${repo_root}:"
+
+        output=$(git "${git_args[@]}" flow release finish -m "${tag_message}" \
+                                        "${release_name}" 2>&1)
+        res=$?
+
+        ;;
+
+
+        *)
+        # git flow release finish prints its own error messages
+        echo "${output}"
+        exit 1
+    esac
+done
+
+export GIT_MERGE_AUTOEDIT=
+
+echo "${output}"
+
+
+echo
+echo 'finishing release complete'
+echo

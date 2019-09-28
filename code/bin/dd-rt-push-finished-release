@@ -1,0 +1,198 @@
+#!/usr/bin/env bash
+
+# dd-rt-push-finished-release
+#
+# push a finished release to remote git repo
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-06-06
+
+
+# NOTE: see also ./dd-rt-release
+
+
+echo
+echo 'push finished release'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+path_to_proj_root='../..'
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# path to ReleaseTools library file, relative to project root
+path_to_rt_lib='code/bin/dd-rt-library.sh'
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('git' 'jq' 'realpath')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=()
+
+
+# -----------------------------------------------------------------------------
+# load BashLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute, canonical path to project root
+path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+
+# absolute, canonical path to ReleaseTools library file
+path_to_rt_lib="${path_to_proj_root}/${path_to_rt_lib}"
+
+
+# -----------------------------------------------------------------------------
+# load ReleaseTools library
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_rt_lib}" 2>&1)"
+then
+    source "${path_to_rt_lib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run ReleaseTools boilerplate functions
+
+if ! get_script_args "${@}"; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute, canonical path to the target project / repository root folder
+repo_root="$(realpath "${repo_root}")"
+
+# absolute path to target project configuration file
+# shellcheck disable=SC2154
+path_to_conf_file="${repo_root}/${path_to_target_conf}"
+
+# arguments passed to git (not to a sub-command) with every call
+git_args=('-C' "${repo_root}")
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+# shellcheck disable=SC2034
+attrs=(version)
+# shellcheck disable=SC2034
+opt_attrs=()
+
+echo
+echo 'Load script configuration file:'
+if ! get_attrs_from_yaml_file "${path_to_conf_file}" attrs opt_attrs
+then
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# shellcheck disable=SC2154
+major="$(jq -r '.major' <<< "${version}")"
+minor="$(jq -r '.minor' <<< "${version}")"
+patch="$(jq -r '.patch' <<< "${version}")"
+
+release_name="${major}.${minor}.${patch}"
+
+
+# -----------------------------------------------------------------------------
+# push the finished release
+
+
+# TODO: create script to verify these prerequisites and run earlier than here
+
+# NOTE: this script expects to be called in the following context:
+# dd-rt-publish has finished the release, i.e. merged the release branch to master
+# and to develop, deleted the local release branch and created a release tag;
+# the tag and the changes merged to develop and master must be pushed to origin,
+# the release branch must be deleted at origin
+
+
+echo
+
+# NOTE: tag name is equal to release name by git flow convention
+# shellcheck disable=SC2154
+echo -n "Push release tag ${release_name} to ${remote_default_name}: "
+if output="$(git "${git_args[@]}" push "${remote_default_name}" \
+                                       "${release_name}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+# TODO: git pull to deal with push rejections due to upstream changes:
+# To <git repo url>
+#    ! [rejected]        develop -> develop (non-fast-forward)
+#   error: failed to push some refs to '<git repo url>'
+#   hint: Updates were rejected because the tip of your current branch is behind
+#   hint: its remote counterpart. Integrate the remote changes (e.g.
+#   hint: 'git pull ...') before pushing again.
+#   hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+
+# shellcheck disable=SC2154
+echo -n "Push changes merged to ${branch_develop} to ${remote_default_name}: "
+if output="$(git "${git_args[@]}" push "${remote_default_name}" \
+                                       "${branch_develop}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+# shellcheck disable=SC2154
+echo -n "Push changes merged to ${branch_master} to ${remote_default_name}: "
+if output="$(git "${git_args[@]}" push "${remote_default_name}" \
+                                       "${branch_master}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+
+echo
+echo 'pushing finished release complete'
+echo

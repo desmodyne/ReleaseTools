@@ -1,0 +1,431 @@
+#!/usr/bin/env bash
+
+# dd-upload-artifacts
+#
+# upload build artifacts to distribution server
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-06-02
+
+
+echo
+echo 'dd-upload-artifacts:'
+echo
+
+# -----------------------------------------------------------------------------
+# determine platform: http://stackoverflow.com/a/18434831
+
+case "${OSTYPE}" in
+
+    # this assumes packages being uploaded were built on this host
+    # and there is no "cross-package-building" taking place, ie.
+    # no creating Debian 32-bit packages on a Ubuntu 64-bit host
+
+    darwin*)
+        grep='ggrep'
+        sed='gsed'
+
+        # OS X distribution
+        distribution='osx'
+
+        # ping return code that goes with error below
+        ping_code=68
+
+        # ping error message for fixable problem
+        ping_err_msg_tmpl='ping: cannot resolve %s: Unknown host'
+
+        # second part of remote folder location, see also usage below;
+        # distribution_channel is not defined here yet, so it will be amended
+        remote_loc_leaf_tmpl="${distribution}/dists/%s"
+
+        ;;
+
+    linux*)
+        # shellcheck disable=SC2034
+        grep='grep'
+        sed='sed'
+
+        dist_name=$(lsb_release --id --short)
+
+        res="$?"
+
+        if [ "${res}" -ne 0 ]
+        then
+            echo "Could not determine Linux distribution name"
+            exit "${res}"
+        fi
+
+        # make sure this is run only on Debian / Ubuntu systems
+        if [ "${dist_name}" != 'Debian' ] && [ "${dist_name}" != 'Ubuntu' ]
+        then
+            echo "Unsupported Linux distribution: ${dist_name}"
+            exit -1
+        fi
+
+        # determine Linux distribution (e.g. debian, ubuntu)
+        # TODO: shellcheck seems to be a little overactive here...
+        # shellcheck disable=SC2034
+        distribution=$(echo "${dist_name}" | tr '[:upper:]' '[:lower:]')
+
+        # get architecture to derive distribution bitness (e.g. i386, amd64)
+        arch=$(arch)
+
+        if   [[ "${arch}" == 'i686' ]]
+        then
+            # shellcheck disable=SC2034
+            distribution_folder='binary-i386'
+        elif [[ "${arch}" == 'x86_64' ]]
+        then
+            # shellcheck disable=SC2034
+            distribution_folder='binary-amd64'
+        else
+            echo "Unsupported architecture ${arch}"
+            exit -1
+        fi
+
+        # archive area: http://askubuntu.com/a/27514
+        # https://www.debian.org/doc/debian-policy/ch-archive.html
+        # shellcheck disable=SC2034
+        archive_area='non-free'
+
+        # second part of remote folder location, see also usage below;
+        # distribution_channel is not defined here yet, so it will be amended
+        remote_loc_leaf_tmpl="${distribution}/dists/%s/"
+        remote_loc_leaf_tmpl+="${archive_area}/${distribution_folder}"
+
+        # ping return code 2 is too generic to be useful
+        ping_code=2
+
+        # ping error message for fixable problem
+        ping_err_msg_tmpl='ping: unknown host %s'
+
+        ;;
+
+    *)
+        echo "Unsupported operating system: ${OSTYPE}"
+        exit -1
+        ;;
+esac
+
+
+# ----------------------------------------a-------------------------------------
+# process command line arguments
+
+# TODO: support passing distribution channel as second argument ?
+
+# if [ ! -z "$2" ]
+# then
+#     # TODO: test channel is supported
+#     distribution_channel="$1"
+#     message="using command line argument, sync'ing to ${distribution_channel} channel at"
+# fi
+
+if [ $# -ne 1 ]
+then
+    echo "Usage: $(basename "$0") <repository root folder>"
+    exit -1
+else
+    if [ ! -e "$1" ]
+    then
+        echo "$1: No such file or directory"
+        exit -1
+    fi
+    if [ ! -d "$1" ]
+    then
+        echo "$1: Not a directory"
+        exit -1
+    fi
+fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to the root folder of the repository to process
+# on Debian, install realpath using e.g. aptitude install realpath
+# on OS X, use grealpath: http://apple.stackexchange.com/a/88812
+repo_root="$(realpath "$1")"
+
+# absolute path to target project configuration
+path_to_proj_conf="${repo_root}/project.conf"
+
+if [ ! -e "${path_to_proj_conf}" ]
+then
+    echo "Failed to find project configuration ${path_to_proj_conf}"
+    exit 1
+fi
+
+# determine git branch of target project to determine distribution channel
+git_branch=$(git -C "${repo_root}" rev-parse --symbolic-full-name --abbrev-ref HEAD)
+
+if [[ "${git_branch}" != 'develop' && \
+      "${git_branch}" !=  feature* && \
+      "${git_branch}" != 'master'  && \
+      "${git_branch}" !=  release* ]]
+then
+    echo "Unsupported git branch / distribution channel ${git_branch}"
+    exit -1
+fi
+
+if   [[ "${git_branch}" ==  'develop' ]]
+then
+    # shellcheck disable=SC2034
+    distribution_channel='develop'
+elif [[ "${git_branch}" ==   feature* ]]
+then
+    # shellcheck disable=SC2034
+    distribution_channel='feature'
+elif [[ "${git_branch}" ==  'master'  ]]
+then
+    # shellcheck disable=SC2034
+    distribution_channel='master'
+elif [[ "${git_branch}" ==   release* ]]
+then
+    # shellcheck disable=SC2034
+    distribution_channel='release'
+fi
+
+# mapping of distribution channel to name
+# and SSH key of user with write privileges
+# NOTE: shellcheck doesn't seem to cope well with alternate notation
+# declare -A channel_2_user_map= ... -  SC1007, SC2034 plus
+# ^-- SC1070: Parsing stopped here because of parsing errors.
+# ^-- SC1036: '(' is invalid here. Did you forget to escape it?
+
+declare -A channel_2_user_map
+
+# shellcheck disable=SC2154
+channel_2_user_map["develop"]="bob.the.builder:id_rsa_bob.the.builder"
+# shellcheck disable=SC2154
+channel_2_user_map["feature"]="dd:id_rsa_desmodyne"
+# shellcheck disable=SC2154
+channel_2_user_map["master"]="bob.the.builder:id_rsa_bob.the.builder"
+# shellcheck disable=SC2154
+channel_2_user_map["release"]="bob.the.builder:id_rsa_bob.the.builder"
+
+user_info="${channel_2_user_map[${distribution_channel}]}"
+
+# full path to and name of SSH private key file used to log into remote server
+ssh_key="$HOME/.ssh/$(echo "${user_info}" | cut -d : -f 2)"
+
+# regular expression to match ssh key fingerprint
+# in ssh-add -l and ssh-keygen -lf output
+regex_fingerprint='^[0-9]+ ([a-z0-9:]+) .+$'
+
+# list of currently supported artifacts types
+# TODO: this should probably come from somewhere global
+supported_artifacts_types='configuration downloads packages'
+
+# name of remote server; defined by us
+# NOTE: 'update' server name is defined in DesmoDyne corporate name server
+remote_server='update'
+
+# name of the user to log in as on the remote server
+remote_user="$(echo "${user_info}" | cut -d : -f 1)"
+
+# template for first part of remote folder location; defined by us
+remote_loc_tmpl='/var/www/desmodyne.com/%s/public_html/protected'
+
+# second part of remote folder location;
+# defined by Debian for Debian packages; defined by us for other artifacts
+declare -A remote_loc_leaves
+
+# configuration is yet to be amended by ship name; downloads isn't used yet
+# TODO: shellcheck seems to be a little overactive here...
+# shellcheck disable=SC2154
+remote_loc_leaves['configuration']="%s/${distribution_channel}"
+# shellcheck disable=SC2154
+remote_loc_leaves['downloads']=""
+# shellcheck disable=SC2059,SC2154
+remote_loc_leaves['packages']="$(printf "${remote_loc_leaf_tmpl}" \
+                                        "${distribution_channel}")"
+
+# rsync switches
+rsync_switches='--archive --checksum --verbose'
+
+
+# -----------------------------------------------------------------------------
+# upload artifacts to remote server
+
+echo -n "Test-ping remote server: "
+ping_output=$(ping -c 1 "${remote_server}" 2>&1)
+
+res="$?"
+
+if [ "${res}" -eq 0 ]
+then
+    echo 'OK'
+    echo
+else
+    # shellcheck disable=SC2059
+    ping_err_msg="$(printf "${ping_err_msg_tmpl}" "${remote_server}")"
+
+    if [ "${res}" -eq "${ping_code}" ] && \
+       [ "${ping_output}" = "${ping_err_msg}" ]
+    then
+        echo "${ping_output}"
+        echo "Maybe add a line '<IP address>  ${remote_server}' to /etc/hosts ?"
+    else
+        echo "unexpected failure:"
+        echo "${ping_output}"
+    fi
+
+    echo
+    exit -1
+fi
+
+echo "Repository at ${repo_root} is on git branch ${git_branch},"
+echo "upload to ${distribution_channel} channel"
+echo
+
+if [ ! -r "${ssh_key}" ]
+then
+    echo "Would use SSH key ${ssh_key} to connect, but couldn't find that file."
+    exit -1
+fi
+
+# TODO: if ssh agent is not running or key passphrase is not cached,
+# abort and print instructions what to do before retrying
+
+echo "Use SSH key ${ssh_key} to connect"
+
+ssh_key_fingerprint="$(ssh-keygen -lf "${ssh_key}" \
+                           | "${sed}" -r -e "s|${regex_fingerprint}|\1|g")"
+echo "  SSH key fingerprint: ${ssh_key_fingerprint}"
+
+# TODO: I am at a loss here - this all works fine on vm-build-debian-stable,
+# but on vm-build-nice, this _does_ finds the ssh agent, but ssh-add -l reports
+# 'The agent has no identities.'; setting SSH_AUTH_SOCK explicitely fixes this.
+# vm-build-nice is anyway on the way out; remove this once it's gone for good.
+
+if [ "$(hostname)" = 'vm-build-nice' ]
+then
+    SSH_AUTH_SOCK='/home/bob.the.builder/.ssh/ssh_auth_sock'
+fi
+
+# TODO: also use ${SSH_AGENT_PID} ?
+if [ -z "${SSH_AUTH_SOCK}" ]
+then
+    # TODO: start ssh agent & add ssh key using passphrase from .secret folder ?
+    # then at least both GPG and SSH agent would be handled in the same way
+    # requires using expect though: http://unix.stackexchange.com/a/90869
+    # TODO: get any secrets as required from Hashicorp Vault password server
+    # TODO: scan for active ssh-agent processes or existing ssh auth socks ?
+    # ssh-agent -s sample output:
+    #   SSH_AUTH_SOCK=/tmp/ssh-ieIVK1IGVv29/agent.25687; export SSH_AUTH_SOCK;
+    #   SSH_AGENT_PID=25688; export SSH_AGENT_PID;
+    #   echo Agent pid 25688;
+    # eval "$(ssh-agent -s)" sample output:
+    #   Agent pid 25688
+    # TODO: after killing all ssh-agents and even after a reboot, this code is
+    # never hit; /home/bob.the.builder/.ssh/ssh_auth_sock is a symlink to
+    # /tmp/ssh-fKVb5d9s4i91/agent.24066, but that socket no longer exists;
+    # the build job succeeds anyway with a message like:
+    #   re-use SSH agent at /tmp/workspace/ ...
+    #     ... TTTest_develop_linux_64_upload_ssc@tmp/ssh7706433244521684880
+
+    message='Failed to contact SSH agent. Please ssh into this machine as user '
+    message+="${remote_user} and run 'ssh-add ${ssh_key}'"
+    echo "${message}"
+    exit -1
+else
+    echo "  re-use SSH agent at ${SSH_AUTH_SOCK}"
+fi
+
+# compare ssh key fingerprint against those stored in ssh agent
+
+# http://stackoverflow.com/a/9607373
+# http://stackoverflow.com/a/25465155
+
+# NOTE: there's an annoying difference (.pub) in tool output:
+# ssh-add -l sample output (wrapping indicated by ... ):
+# 4096 36:ab:bc:9f:93:c2:ee:8f:51:0b:b4:a1:46:96:d3:7f ...
+#  ... /home/bob.the.builder/.ssh/id_rsa_bob.the.builder (RSA)
+# ssh-keygen -lf ~/.ssh/id_rsa_bob.the.builder
+# 4096 36:ab:bc:9f:93:c2:ee:8f:51:0b:b4:a1:46:96:d3:7f ...
+#  ... /home/bob.the.builder/.ssh/id_rsa_bob.the.builder.pub (RSA)
+#
+# the difference is larger, but not less annoying, on vm-build-debian-stable:
+# 4096 36:ab:bc:9f:93:c2:ee:8f:51:0b:b4:a1:46:96:d3:7f  ...
+#  ... bob.the.builder (bob.the.builder@desmodyne.com) (RSA)
+# 4096 36:ab:bc:9f:93:c2:ee:8f:51:0b:b4:a1:46:96:d3:7f  ...
+#  ... /home/bob.the.builder/.ssh/id_rsa_bob.the.builder.pub (RSA)
+
+current_keys="$(ssh-add -l)"
+
+# TODO: review this
+# https://github.com/koalaman/shellcheck/wiki/SC2143
+if echo "${current_keys}" | grep -q "${ssh_key_fingerprint}"
+then
+    echo "  re-use existing identity represented by SSH agent"
+else
+  # TODO: align ssh-add output with convention
+  echo -n '  no matching identities found: '
+  ssh-add "${ssh_key}"
+fi
+
+echo
+
+artifacts_json="$(jq '.Artifacts' "${path_to_proj_conf}")"
+artifacts_types="$(echo "${artifacts_json}" | jq -r 'keys[]' )"
+
+for artifacts_type in ${artifacts_types}
+do
+    # http://stackoverflow.com/a/8063398
+    # shellcheck disable=SC2076
+    if [[ ! " ${supported_artifacts_types} " =~ " ${artifacts_type} " ]]
+    then
+        echo "Unsupported artifact type ${artifacts_type}"
+        continue
+    fi
+
+    echo "${artifacts_type}:"
+    echo
+
+    # TODO: support globs ?
+
+    # local folder to upload, relative to target project root
+    rel_local_folder="$(echo "${artifacts_json}" | jq -r ".${artifacts_type}")"
+
+    # absolute path to local folder to upload
+    abs_local_folder="${repo_root}/${rel_local_folder}"
+
+    if [ ! -e "${abs_local_folder}" ]
+    then
+        echo "${abs_local_folder}: No such file or directory"
+        continue
+    fi
+    if [ ! -d "${abs_local_folder}" ]
+    then
+        echo "${abs_local_folder}: Not a directory"
+        continue
+    fi
+
+    local_folder="$(realpath "${abs_local_folder}")"
+
+    # remote server and folder to upload to
+    remote_loc_leaf="${remote_loc_leaves[$artifacts_type]}"
+
+    if [ "${artifacts_type}" = 'configuration' ]
+    then
+        ship_name="$(jq -r '.ShipName' "${path_to_proj_conf}")"
+        # shellcheck disable=SC2059
+        remote_loc_leaf=$(printf "${remote_loc_leaf}" "${ship_name}")
+    fi
+
+    # shellcheck disable=SC2059
+    remote_loc=$(printf "${remote_loc_tmpl}" "${artifacts_type}")
+    remote_location="${remote_user}@${remote_server}:"
+    remote_location+="${remote_loc}/${remote_loc_leaf}"
+
+    printf "sync %s\nto   %s:\n" "${local_folder}" "${remote_location}"
+    echo "rsync ${rsync_switches} ${local_folder}/ ${remote_location}"
+    # shellcheck disable=SC2086
+    rsync ${rsync_switches} "${local_folder}/" "${remote_location}"
+done
+
+
+echo
+echo 'dd-upload-artifacts: success'
+echo

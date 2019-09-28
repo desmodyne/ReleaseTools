@@ -1,0 +1,400 @@
+#!/usr/bin/env bash
+
+# get-repo-info
+#
+# provide information on a git repository in json format
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2016-12-27
+
+
+# TODO: document version standard (semver, tags, git, etc.)
+# TODO: move this script elsewhere for wider usage
+# TODO: print error messages only if --verbose is passed ?
+# TODO: BUG - if this script was run on a repo with a semver, it is reported
+# incorrectly as that semver when run again on a repo without a semver
+
+
+echo
+echo 'get repository information'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+path_to_proj_root='../..'
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# path to script configuration file, relative to project root
+path_to_conf_file='cicd/conf/get-repo-info.yaml'
+
+# TODO: shellcheck reports these to be unused
+# https://github.com/koalaman/shellcheck/wiki/SC2034
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('git' 'jq' 'realpath')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=()
+
+
+# -----------------------------------------------------------------------------
+# load BashLib
+
+# NOTE: this only tests if library can be sourced;
+# functions are only defined in "$(...)" subshell,
+# so a second source for use in here is required
+# https://github.com/koalaman/shellcheck/wiki/SC1090
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+# NOTE: ideally, these function calls would be something like e.g.
+#   if ! output="$(configure_platform 2>&1)"
+#     ...
+# but on the one hand, they have their own output which should be displayed as
+# it occurs and more importantly, any changes to global variables would only be
+# effective in the subshell created by the braces around the function name and
+# would be lost to this script, effectively rendering the function call useless
+
+if ! configure_platform              ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute, canonical path to project root
+path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+
+# absolute, canonical path to configuration file
+path_to_conf_file="${path_to_proj_root}/${path_to_conf_file}"
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+# shellcheck disable=SC2034
+attrs=(dirty_string
+       no_branch_fallback no_commit_fallback no_count_fallback
+       no_remote_fallback no_semver_fallback no_stage_fallback
+       no_status_fallback no_tag_fallback    no_version_fallback)
+# shellcheck disable=SC2034
+opt_attrs=()
+
+echo
+echo 'Load script configuration file:'
+if ! get_attrs_from_yaml_file "${path_to_conf_file}" attrs opt_attrs
+then
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# process command line arguments
+
+repo_root="$1"
+
+if [ $# -ne 1 ]
+then
+    echo "Usage: $(basename "$0") <folder in repository tree>"
+    exit 1
+else
+    if [ ! -e "${repo_root}" ]
+    then
+        echo "${repo_root}: No such file or directory"
+        exit 1
+    fi
+    if [ ! -d "${repo_root}" ]
+    then
+        echo "${repo_root}: Not a directory"
+        exit 1
+    fi
+fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to the root folder of the repository to process
+repo_root="$(realpath "${repo_root}")"
+
+# base arguments used with every call to git
+# TODO: any advantage in using --git-dir and/or --work-tree ?
+# https://git-scm.com/docs/git#git---git-dirltpathgt
+# https://git-scm.com/docs/git#git---work-treeltpathgt
+git_base_args=('-C' "${repo_root}")
+
+# git describe arguments
+# https://git-scm.com/docs/git-describe
+# http://unix.stackexchange.com/q/22764
+# TODO: trying to use anything like --dirty=' DIRTY' fails with
+# fatal: --dirty is incompatible with commit-ishes
+git_desc_args=('describe' '--always' "--dirty=${dirty_string}")
+
+# git rev-list arguments
+# https://git-scm.com/docs/git-rev-list
+git_revl_args=('rev-list' '--count' 'HEAD')
+
+# git rev-parse arguments
+# https://git-scm.com/docs/git-rev-parse
+git_revp_args=('rev-parse' '--abbrev-ref' 'HEAD')
+
+# git remote arguments
+# https://git-scm.com/docs/git-remote
+git_rmte_args=('remote' 'get-url' 'origin')
+
+# git status arguments
+# https://git-scm.com/docs/git-status
+git_stat_args=('status' '--porcelain')
+
+# git info output template
+read -r -d '' output_tmpl <<'EOT'
+{
+    "location" : "%s",
+    "branch"   : "%s",
+    "commit"   : "%s",
+    "is_dirty" : "%s",
+    "remote"   : "%s",
+    "semver"   : "%s",
+    "stage"    : "%s",
+    "version"  : "%s"
+}
+EOT
+
+
+# -----------------------------------------------------------------------------
+# get repository information
+
+echo -n 'get git repo branch: '
+if output="$(git "${git_base_args[@]}" "${git_revp_args[@]}" 2>&1)"
+then
+    echo 'OK'
+    git_branch="${output}"
+
+    # TODO: use CI env var to determine if running in CI/CD context ?
+    if [ "${git_branch}" == 'HEAD' ] && [ -n "${CI_COMMIT_REF_NAME}" ]
+    then
+        echo 'running in CI/CD context, using CI_COMMIT_REF_NAME env var'
+        git_branch="${CI_COMMIT_REF_NAME}"
+    fi
+else
+    echo 'ERROR:'
+    echo "${output}"
+    # shellcheck disable=SC2154
+    echo "using ${no_branch_fallback} as fallback"
+    git_branch="${no_branch_fallback}"
+fi
+
+# TODO: only for debugging; remove
+echo "git_branch: ${git_branch}"
+
+echo -n 'get git repo remote: '
+# http://stackoverflow.com/q/4089430
+if output="$(git "${git_base_args[@]}" "${git_rmte_args[@]}" 2>&1)"
+then
+    echo 'OK'
+    git_remote="${output}"
+else
+    echo 'ERROR:'
+    echo "${output}"
+    # shellcheck disable=SC2154
+    echo "using ${no_remote_fallback} as fallback"
+    git_remote="${no_remote_fallback}"
+fi
+
+echo -n 'get git repo status: '
+# https://stackoverflow.com/a/5737794
+if output="$(git "${git_base_args[@]}" "${git_stat_args[@]}" 2>&1)"
+then
+    echo 'OK'
+
+    if [ -n "${output}" ]
+    then
+        is_dirty='true'
+    else
+        is_dirty='false'
+    fi
+else
+    echo 'ERROR:'
+    echo "${output}"
+    # shellcheck disable=SC2154
+    echo "using ${no_status_fallback} as fallback"
+    is_dirty="${no_status_fallback}"
+fi
+
+if [ "${git_branch}" = "${no_branch_fallback}" ]
+then
+    echo 'no branch info available to determine stage;'
+    # shellcheck disable=SC2154
+    echo "using ${no_stage_fallback} as fallback"
+    git_stage="${no_stage_fallback}"
+else
+    echo -n 'get git repo stage: '
+    # NOTE: no quoting required:
+    # http://mywiki.wooledge.org/BashFAQ/031
+    if  [[  ${git_branch}  == 'feature/'* ]]
+    then
+        git_stage='feature'
+        echo 'OK'
+    elif [ "${git_branch}" == 'develop' ] || \
+         [ "${git_branch}" == 'master'  ]
+    then
+        git_stage="${git_branch}"
+        echo 'OK'
+    elif [[  ${git_branch} == 'release/'* ]]
+    then
+        git_stage='release'
+        echo 'OK'
+    else
+        echo 'ERROR'
+        echo 'unexpected branch info while determining stage:'
+        echo "  ${git_branch}"
+        echo "using ${no_stage_fallback} as fallback"
+        git_stage="${no_stage_fallback}"
+    fi
+fi
+
+
+# NOTE: for release branches, the semver in the branch name is more recent
+# and therefore must take precendence over the semver reported by git describe
+if [ "${git_stage}" = 'release' ]
+then
+    echo -n 'get git repo semver from branch: '
+    git_semver="${git_branch##*/}"
+    echo "${git_semver}"
+fi
+
+echo -n 'get git repo version: '
+if output="$(git "${git_base_args[@]}" "${git_desc_args[@]}" 2>&1)"
+then
+    echo 'OK'
+    git_version="${output}"
+
+    # sample output:
+    # clean repo, no release tags: commit hash only, e.g. d844df9
+    # clean repo, release tags: tags, commits since, hash, e.g. 0.0.1-6-g9faea6e
+    # dirty repo, no release tags: hash, dirty string, e.g. b4a3a83-DIRTY
+    # dirty repo, release tags: all of the above, e.g. 0.0.1-6-g9faea6e-DIRTY
+    # echo "git_version: ${git_version}"
+
+    #           d844df9       --> d844df9
+    #           b4a3a83-DIRTY --> b4a3a83
+    # 0.1.5-42-g652c397       --> 652c397
+    # 0.1.5-42-g652c397-DIRTY --> 652c397
+    sed_expr='s|.*\([0-9a-f]\{7\}\).*|\1|g'
+    echo -n 'get commit from git version: '
+    # shellcheck disable=SC2154
+    if output="$("${sed}" -e "${sed_expr}" <<< "${git_version}")"
+    then
+        echo 'OK'
+        git_commit="${output}"
+    else
+        echo 'ERROR:'
+        echo "${output}"
+        # shellcheck disable=SC2154
+        echo "using ${no_commit_fallback} as fallback"
+        git_commit="${no_commit_fallback}"
+    fi
+
+    if [[ "${git_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]
+    then
+        if [ -z "${git_semver}" ]
+        then
+            # 0.1.5-42-g652c397 --> 0.1.5
+            # semver: http://semver.org
+            echo -n 'get semver from git version: '
+            if output="${git_version%%-*}"
+            then
+                echo 'OK'
+                git_semver="${output}"
+            else
+                echo 'ERROR:'
+                echo "${output}"
+                # shellcheck disable=SC2154
+                echo "using ${no_semver_fallback} as fallback"
+                git_semver="${no_semver_fallback}"
+            fi
+        fi
+
+    # if there is no semver tag in the repository yet, git describe reports
+    # the most recent commit hash; get commit count & reconstruct string
+    else
+        echo -n 'get git commit count: '
+        if output="$(git "${git_base_args[@]}" "${git_revl_args[@]}" 2>&1)"
+        then
+            echo 'OK'
+            git_commit_count="${output}"
+        else
+            echo 'ERROR:'
+            echo "${output}"
+            # shellcheck disable=SC2154
+            echo "using ${no_count_fallback} as fallback"
+            git_commit_count="${no_count_fallback}"
+        fi
+
+        if [ -z "${git_semver}" ]
+        then
+            git_semver="${no_semver_fallback}"
+        fi
+
+        # shellcheck disable=SC2154
+        git_version="${no_tag_fallback}-${git_commit_count}-g${git_commit}"
+
+        if [ "${is_dirty}" = true ]
+        then
+            git_version+="${dirty_string}"
+        fi
+    fi
+else
+    if [ -z "${git_semver}" ]
+    then
+        git_semver="${no_semver_fallback}"
+    fi
+
+    # the same fallback applies here as for git rev-parse above; however,
+    # if there is a repo, git describe returns _something_ usable as version
+    echo 'ERROR:'
+    echo "${output}"
+    # shellcheck disable=SC2154
+    echo "using ${no_version_fallback} as fallback"
+    git_version="${no_version_fallback}"
+fi
+
+# shellcheck disable=SC2034,SC2059
+repo_info="$(printf "${output_tmpl}" "${repo_root}"    \
+                                     "${git_branch}"   \
+                                     "${git_commit}"   \
+                                     "${is_dirty}"     \
+                                     "${git_remote}"   \
+                                     "${git_semver}"   \
+                                     "${git_stage}"    \
+                                     "${git_version}")"
+
+# useful for debugging:
+# echo 'repo_info:'
+# jq '.' <<< "${repo_info}"
+
+
+echo
+echo 'repository information complete'
+echo
