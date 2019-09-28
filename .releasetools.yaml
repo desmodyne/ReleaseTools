@@ -12,6 +12,8 @@
 # email_regex='[a-z\.]@desmodyne.com'
 
 # users known to this organization
+# NOTE: this might get used at some later stage by
+# ReleaseTools > dd-rt-verify-user-configuration
 users:
 
   # username on current host
