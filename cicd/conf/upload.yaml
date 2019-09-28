@@ -1,0 +1,55 @@
+---
+# upload.yaml
+#
+# CI/CD scripts configuration file
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-10-07
+
+
+# path to brew formula repository root, relative to project root
+path_to_brew_repo:     ../../homebrew-tools
+
+# path to brew formula template file, relative to project root
+path_to_brew_tmpl:     cicd/data/tmpl/dd-release-tools.rb.j2
+
+# path to local temp folder used for upload, relative to project root;
+path_to_local_tmp:     tmp/upload
+
+# github repository url
+github_repo_url:       https://github.com/desmodyne/ReleaseTools.git
+
+# branch to push to github
+github_branch:         master
+
+# project homepage url on github.com
+homepage:              https://github.com/desmodyne/ReleaseTools
+
+# path to release archive, relative to homepage
+archive_path:          archive
+
+# release archive filename template
+archive_tmpl:          '%s.tar.gz'
+
+# brew formula gitlab repository url
+# NOTE: not currently used, see script
+brew_repo_gitlab_url:  https://gitlab.com/DesmoDyne/homebrew-tools.git
+
+# brew formula github repository url
+brew_repo_github_url:  https://github.com/desmodyne/homebrew-tools.git
+
+# brew formula filename, located in local temp folder
+brew_formula:          dd-release-tools.rb
+
+# path to brew formula folder, relative to brew formula repository root
+formula_folder:        Formula
+
+# git username when running in CI/CD context
+git_ci_user:           Bob the Builder
+
+# git user email address when running in CI/CD context
+git_ci_email:          bob.the.builder@desmodyne.com
+
+# git commit message template
+git_msg_tmpl:          '[#1]: update formula for DesmoDyne ReleaseTools to version %s'

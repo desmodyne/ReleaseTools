@@ -1,0 +1,19 @@
+# .gitlab-ci.yml
+#
+# gitlab.com CI/CD YAML configuration
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-09-30
+
+
+# https://gitlab.com/help/ci/quick_start/README#creating-a-gitlab-ciyml-file
+# https://gitlab.com/help/ci/yaml/README.md
+# https://gitlab.com/help/ci/docker/using_docker_images.md ...
+#  ... #define-image-and-services-from-gitlab-ciyml
+
+
+upload:
+  only:
+    - master
+  script: cicd/bin/upload
