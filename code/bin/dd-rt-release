@@ -84,6 +84,8 @@ marker_end="${dd_bashlib_marker_end}"
 # -----------------------------------------------------------------------------
 # run BashLib boilerplate functions
 
+# TODO: remove code duplication: this is the same section in all Tools scripts
+
 # NOTE: ideally, these function calls would be something like e.g.
 #   if ! output="$(configure_platform 2>&1)"
 #     ...

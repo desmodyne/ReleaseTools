@@ -192,6 +192,8 @@ else
     current_username="$(id -u -n)"
 
     # set details for known users automatically
+    # TODO: align this with convention:
+    # mapfile -t known_users < <(jq -r 'keys[]' <<< "${users}")
     # shellcheck disable=SC2154
     mapfile -t known_users <<< "$(jq -r 'keys[]' <<< "${users}")"
 
