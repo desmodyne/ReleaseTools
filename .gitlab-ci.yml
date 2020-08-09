@@ -1,6 +1,7 @@
+---
 # .gitlab-ci.yml
 #
-# gitlab.com CI/CD YAML configuration
+# gitlab CI/CD YAML configuration file
 #
 # author  : stefan schablowski
 # contact : stefan.schablowski@desmodyne.com
@@ -8,12 +9,18 @@
 
 
 # https://gitlab.com/help/ci/quick_start/README#creating-a-gitlab-ciyml-file
-# https://gitlab.com/help/ci/yaml/README.md
+# gitlab docs for this file: https://gitlab.com/help/ci/yaml/README.md
+# gitlab docs on using docker-in-docker executor:
+# https://docs.gitlab.com/ee/ci/docker/using_docker_build.html ...
+#  ... #use-docker-in-docker-executor
 # https://gitlab.com/help/ci/docker/using_docker_images.md ...
 #  ... #define-image-and-services-from-gitlab-ciyml
 
+stages:
+  - upload
 
 upload:
   only:
     - master
   script: cicd/bin/upload
+  stage:  upload

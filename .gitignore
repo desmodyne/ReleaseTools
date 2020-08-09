@@ -30,6 +30,7 @@ tmp
 
 
 # -----------------------------------------------------------------------------
-# Python byte-compiled / optimized files
+# Python
 
+# byte-compiled / optimized files
 *.py[cod]

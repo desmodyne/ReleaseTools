@@ -34,11 +34,11 @@ path_to_conf_file="cicd/conf/$(basename "${BASH_SOURCE[0]}").yaml"
 
 # array with alphabetical list of tools called by this script
 # shellcheck disable=SC2034
-req_tools=('curl' 'get-repo-info' 'jinja2' 'realpath' 'sha256sum')
+req_tools=('curl' 'dd-rpt-get-repo-info' 'jinja2' 'realpath' 'sha256sum')
 
 # array with paths to append to PATH
 # shellcheck disable=SC2034
-ext_paths=("${here}")
+ext_paths=()
 
 # arguments for every curl call
 # http://stackoverflow.com/a/21109454
@@ -111,7 +111,7 @@ path_to_local_tmp="${path_to_proj_root}/${path_to_local_tmp}"
 # get git repository information
 
 # shellcheck disable=SC1091
-if ! source get-repo-info "${path_to_proj_root}"; then exit 1; fi
+if ! source dd-rpt-get-repo-info "${path_to_proj_root}"; then exit 1; fi
 
 # shellcheck disable=SC2154
 is_dirty="$(jq -r '.is_dirty' <<< "${repo_info}")"
@@ -129,7 +129,7 @@ then
     exit 1
 fi
 
-# TODO: get 'NO SEMVER' from .../cicd/conf/get-repo-info.yaml
+# TODO: get 'NO SEMVER' from (RepoTools ?) conf
 if [ "${semver}" = 'NO SEMVER' ]
 then
     echo 'ERROR: git repository does not have a release semver; can not upload'
