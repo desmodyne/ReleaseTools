@@ -8,25 +8,6 @@
 # created : 2019-07-03
 
 
-# TODO: support email address convention:
-# email_regex='[a-z\.]@desmodyne.com'
-
-# users known to this organization
-# NOTE: this might get used at some later stage by
-# ReleaseTools > dd-rt-verify-user-configuration
-users:
-
-  # username on current host
-  bob:
-    # git config user.name
-    name  : Bob the Builder
-    # git config user.email
-    email : bob.the.builder@desmodyne.com
-
-  ssc:
-    name  : Stefan Schablowski
-    email : stefan.schablowski@desmodyne.com
-
 # project version in semver format
 # major.minor.patch: http://semver.org
 # https://en.wikipedia.org/wiki/Software_versioning

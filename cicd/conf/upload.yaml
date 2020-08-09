@@ -12,7 +12,7 @@
 path_to_brew_repo:     ../../homebrew-tools
 
 # path to brew formula template file, relative to project root
-path_to_brew_tmpl:     cicd/data/tmpl/dd-release-tools.rb.j2
+path_to_brew_tmpl:     cicd/tmpl/dd-release-tools.rb.j2
 
 # path to local temp folder used for upload, relative to project root;
 path_to_local_tmp:     tmp/upload

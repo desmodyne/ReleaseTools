@@ -23,14 +23,11 @@ echo
 # absolute path to this script: http://stackoverflow.com/a/9107028
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# path from this script to project root
-path_to_proj_root='../..'
-
 # absolute path to BashLib library file
 path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
 
-# path to ReleaseTools library file, relative to project root
-path_to_rt_lib='code/bin/dd-rt-library.sh'
+# name of ReleaseTools library file
+name_of_rt_lib='dd-rt-library.sh'
 
 # array with alphabetical list of tools called by this script
 # shellcheck disable=SC2034
@@ -55,20 +52,80 @@ fi
 
 
 # -----------------------------------------------------------------------------
+# configure script parameters
+
+# string to mark the line before relevant output on stdout
+# shellcheck disable=SC2154
+marker_start="${dd_bashlib_marker_start}"
+
+# string to mark the line after relevant output on stdout
+# shellcheck disable=SC2154
+marker_end="${dd_bashlib_marker_end}"
+
+
+# -----------------------------------------------------------------------------
 # run BashLib boilerplate functions
 
 if ! configure_platform              ; then exit 1; fi
 if ! extend_path req_tools ext_paths ; then exit 1; fi
 
+echo -n 'Get ReleaseTools environment: '
+if output="$(get_environment "${here}" 2>&1)"
+then
+    echo 'OK'
+    env_json="${output}"
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+# NOTE: see also BashLib > get_environment function documentation
+sedex="/${marker_start}/,/${marker_end}/!d;/${marker_end}/q"
+env_json="$(sed "${sedex}" <<< "${env_json}" 2>&1)"
+env_json="$(sed '1d;$d'    <<< "${env_json}" 2>&1)"
+
 
 # -----------------------------------------------------------------------------
 # configure script parameters
 
-# absolute, canonical path to project root
-path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+environment="$(jq -r '.environment' <<< "${env_json}")"
 
-# absolute, canonical path to ReleaseTools library file
-path_to_rt_lib="${path_to_proj_root}/${path_to_rt_lib}"
+if   [ "${environment}" = 'development' ]
+then
+    # path to library folder in development, relative to project root
+    path_to_lib_dev="code/lib"
+
+    # path from this script to project root
+    path_to_proj_root='../..'
+
+    # absolute, canonical path to project root
+    path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+
+    # absolute path to configuration root folder
+    path_to_lib_root="${path_to_proj_root}/${path_to_lib_dev}"
+
+    # absolute, canonical path to configuration file
+    path_to_rt_lib="${path_to_lib_root}/${name_of_rt_lib}"
+
+elif [ "${environment}" = 'production'  ]
+then
+    # path to library folder in production, relative to installation root
+    path_to_lib_prod="lib"
+
+    # absolute path to brew package installation root
+    path_to_inst_root="$(brew --prefix)"
+
+    # absolute path to configuration root folder
+    path_to_lib_root="${path_to_inst_root}/${path_to_lib_prod}"
+
+    # absolute, canonical path to configuration file
+    path_to_rt_lib="${path_to_lib_root}/${name_of_rt_lib}"
+
+else
+    echo 'failed to determine RepoTools environment'
+    exit 1
+fi
 
 
 # -----------------------------------------------------------------------------
